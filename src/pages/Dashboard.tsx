@@ -3,27 +3,47 @@ import { motion } from "framer-motion";
 import { TrendingUp, DollarSign, Target, TrendingDown, ClipboardList, Clock } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { KPICard } from "@/components/dashboard/KPICard";
+import { LucroChart } from "@/components/dashboard/LucroChart";
+import { DistributionChart } from "@/components/dashboard/DistributionChart";
 import { apostasService } from "@/services/apostas";
 import { useFilterStore } from "@/store/useFilterStore";
 import { formatCurrency, formatPercentage } from "@/lib/utils";
-import type { KPIData } from "@/types/betting";
+import type { KPIData, SeriesData } from "@/types/betting";
 
 export default function Dashboard() {
   const [kpis, setKpis] = useState<KPIData | null>(null);
+  const [series, setSeries] = useState<SeriesData[]>([]);
+  const [distribution, setDistribution] = useState<{ name: string; value: number }[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { startDate, endDate, casa, tipo } = useFilterStore();
 
   useEffect(() => {
-    loadKPIs();
+    loadData();
   }, [startDate, endDate, casa, tipo]);
 
-  const loadKPIs = async () => {
+  const loadData = async () => {
     setIsLoading(true);
     try {
-      const data = await apostasService.kpis({ startDate, endDate, casa, tipo });
-      setKpis(data);
+      const [kpisData, seriesData, apostas] = await Promise.all([
+        apostasService.kpis({ startDate, endDate, casa, tipo }),
+        apostasService.series({ startDate, endDate, casa, tipo }),
+        apostasService.list({ startDate, endDate, casa, tipo }),
+      ]);
+      
+      setKpis(kpisData);
+      setSeries(seriesData);
+
+      const statusCount = apostas.data.reduce((acc, aposta) => {
+        const status = aposta.resultado || "Pendente";
+        acc[status] = (acc[status] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+
+      setDistribution(
+        Object.entries(statusCount).map(([name, value]) => ({ name, value }))
+      );
     } catch (error) {
-      console.error("Erro ao carregar KPIs:", error);
+      console.error("Erro ao carregar dados:", error);
     } finally {
       setIsLoading(false);
     }
@@ -93,6 +113,11 @@ export default function Dashboard() {
               isLoading={isLoading}
               delay={0.5}
             />
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <LucroChart data={series} isLoading={isLoading} />
+            <DistributionChart data={distribution} isLoading={isLoading} />
           </div>
         </TabsContent>
 

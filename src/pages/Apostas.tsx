@@ -1,7 +1,37 @@
+import { useState, useEffect } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { motion } from "framer-motion";
+import { apostasService } from "@/services/apostas";
+import { useFilterStore } from "@/store/useFilterStore";
+import { ApostasTable } from "@/components/apostas/ApostasTable";
+import type { Aposta } from "@/types/betting";
 
 export default function Apostas() {
+  const [apostas, setApostas] = useState<Aposta[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const { startDate, endDate, casa, tipo, resultado } = useFilterStore();
+
+  useEffect(() => {
+    loadApostas();
+  }, [startDate, endDate, casa, tipo, resultado]);
+
+  const loadApostas = async () => {
+    setIsLoading(true);
+    try {
+      const { data } = await apostasService.list({ startDate, endDate, casa, tipo, resultado });
+      setApostas(data);
+    } catch (error) {
+      console.error("Erro ao carregar apostas:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const filterByStatus = (status?: string) => {
+    if (!status) return apostas;
+    return apostas.filter((a) => a.resultado === status);
+  };
+
   return (
     <div className="space-y-6">
       <motion.div
@@ -17,19 +47,46 @@ export default function Apostas() {
 
       <Tabs defaultValue="todas" className="space-y-6">
         <TabsList>
-          <TabsTrigger value="todas">Todas</TabsTrigger>
-          <TabsTrigger value="pendentes">Pendentes</TabsTrigger>
-          <TabsTrigger value="ganhos">Ganhos</TabsTrigger>
-          <TabsTrigger value="perdidos">Perdidos</TabsTrigger>
-          <TabsTrigger value="canceladas">Canceladas</TabsTrigger>
-          <TabsTrigger value="cashout">Cashout</TabsTrigger>
-          <TabsTrigger value="nova">Nova Aposta</TabsTrigger>
+          <TabsTrigger value="todas">Todas ({apostas.length})</TabsTrigger>
+          <TabsTrigger value="pendentes">
+            Pendentes ({filterByStatus("Pendente").length})
+          </TabsTrigger>
+          <TabsTrigger value="ganhos">
+            Ganhos ({filterByStatus("Ganhou").length})
+          </TabsTrigger>
+          <TabsTrigger value="perdidos">
+            Perdidos ({filterByStatus("Perdeu").length})
+          </TabsTrigger>
+          <TabsTrigger value="canceladas">
+            Canceladas ({filterByStatus("Cancelado").length})
+          </TabsTrigger>
+          <TabsTrigger value="cashout">
+            Cashout ({filterByStatus("Cashout").length})
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="todas">
-          <div className="text-center py-12 text-muted-foreground">
-            Lista de apostas em desenvolvimento...
-          </div>
+          <ApostasTable data={apostas} isLoading={isLoading} />
+        </TabsContent>
+
+        <TabsContent value="pendentes">
+          <ApostasTable data={filterByStatus("Pendente")} isLoading={isLoading} />
+        </TabsContent>
+
+        <TabsContent value="ganhos">
+          <ApostasTable data={filterByStatus("Ganhou")} isLoading={isLoading} />
+        </TabsContent>
+
+        <TabsContent value="perdidos">
+          <ApostasTable data={filterByStatus("Perdeu")} isLoading={isLoading} />
+        </TabsContent>
+
+        <TabsContent value="canceladas">
+          <ApostasTable data={filterByStatus("Cancelado")} isLoading={isLoading} />
+        </TabsContent>
+
+        <TabsContent value="cashout">
+          <ApostasTable data={filterByStatus("Cashout")} isLoading={isLoading} />
         </TabsContent>
       </Tabs>
     </div>
