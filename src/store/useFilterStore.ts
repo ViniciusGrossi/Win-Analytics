@@ -21,8 +21,8 @@ interface FilterState {
 export const useFilterStore = create<FilterState>()(
   persist(
     (set) => ({
-      startDate: dayjs().subtract(30, "day").format("YYYY-MM-DD"),
-      endDate: dayjs().format("YYYY-MM-DD"),
+      startDate: "",
+      endDate: "",
       casa: "",
       tipo: "",
       resultado: "",
@@ -34,8 +34,8 @@ export const useFilterStore = create<FilterState>()(
       setResultado: (resultado) => set({ resultado }),
       setSearch: (search) => set({ search }),
       resetFilters: () => set({
-        startDate: dayjs().subtract(30, "day").format("YYYY-MM-DD"),
-        endDate: dayjs().format("YYYY-MM-DD"),
+        startDate: "",
+        endDate: "",
         casa: "",
         tipo: "",
         resultado: "",
