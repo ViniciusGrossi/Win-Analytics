@@ -8,16 +8,16 @@ import { KPICard } from "@/components/dashboard/KPICard";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
 import {
   Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis, 
-  Line, LineChart, PieChart, Pie, Cell, ComposedChart, Legend, Radar, RadarChart, 
-  PolarGrid, PolarAngleAxis, PolarRadiusAxis, ScatterChart, Scatter, Heatmap
+  Line, LineChart, ComposedChart, Legend, Radar, RadarChart, 
+  PolarGrid, PolarAngleAxis, PolarRadiusAxis, Area, AreaChart, ReferenceLine, PieChart, Pie, Cell
 } from "recharts";
+import { ScatterChart, Scatter } from "recharts";
 import { formatCurrency, formatPercentage } from "@/lib/utils";
 import type { Aposta, SeriesData } from "@/types/betting";
 import dayjs from "dayjs";
-import { AlertCircle, TrendingUp, TrendingDown, Target, Activity, Zap, Trophy, Gauge, BarChart3, Flame, Brain, Calendar, Shield } from "lucide-react";
+import { AlertCircle, TrendingUp, TrendingDown, Target, Activity, Zap, Trophy, BarChart3, Flame, Calendar, Shield, ArrowUp, ArrowDown, Activity as ActivityIcon, Gauge } from "lucide-react";
 
 // Tipos de dados personalizados
 interface PerformanceMetrics {
@@ -26,6 +26,7 @@ interface PerformanceMetrics {
   lucro: number;
   taxaAcerto: number;
   apostas: number;
+  volatility?: number;
 }
 
 interface OddAnalysis {
@@ -42,6 +43,7 @@ interface MonthlyPerformance {
   volume: number;
   apostas: number;
   variacao: number;
+  lucro: number;
 }
 
 interface TimePatterns {
@@ -51,82 +53,143 @@ interface TimePatterns {
   apostas: number;
 }
 
+interface RiskMetrics {
+  maxDrawdown: number;
+  sharpeRatio: number;
+  volatility: number;
+  profitFactor: number;
+  winStreakCurrent: number;
+  winStreakBest: number;
+  lossStreakCurrent: number;
+}
+
 export default function Analises() {
   // Estados
   const [apostas, setApostas] = useState<Aposta[]>([]);
   const [series, setSeries] = useState<SeriesData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   
-  // Dados processados
+  // Dados por aba - Dashboard
+  const [dashboardSeries, setDashboardSeries] = useState<SeriesData[]>([]);
+  const [dashboardKpis, setDashboardKpis] = useState<any>({});
+  
+  // Dados por aba - Casas
   const [byCasa, setByCasa] = useState<{ name: string; lucro: number; apostas: number }[]>([]);
   const [byTipo, setByTipo] = useState<{ name: string; lucro: number }[]>([]);
-  const [byCategoria, setByCategoria] = useState<{ name: string; lucro: number; apostas: number }[]>([]);
-  const [oddSeries, setOddSeries] = useState<{ date: string; odd: number }[]>([]);
   const [performanceByHouse, setPerformanceByHouse] = useState<PerformanceMetrics[]>([]);
+  const [casasMonthly, setCasasMonthly] = useState<any[]>([]);
+  
+  // Dados por aba - Categorias
+  const [byCategoria, setByCategoria] = useState<{ name: string; lucro: number; apostas: number }[]>([]);
+  const [categoriaKpis, setCategoriaKpis] = useState<any>({});
+  
+  // Dados por aba - Odds
   const [oddAnalysis, setOddAnalysis] = useState<OddAnalysis[]>([]);
-  const [monthlyPerformance, setMonthlyPerformance] = useState<MonthlyPerformance[]>([]);
+  const [oddSeries, setOddSeries] = useState<{ date: string; odd: number }[]>([]);
+  const [oddDistribution, setOddDistribution] = useState<any[]>([]);
+  
+  // Dados por aba - Padrões
   const [timePatterns, setTimePatterns] = useState<TimePatterns[]>([]);
+  const [weeklyPerformance, setWeeklyPerformance] = useState<any[]>([]);
+  
+  // Dados por aba - Risco
+  const [riskMetrics, setRiskMetrics] = useState<RiskMetrics>({
+    maxDrawdown: 0,
+    sharpeRatio: 0,
+    volatility: 0,
+    profitFactor: 0,
+    winStreakCurrent: 0,
+    winStreakBest: 0,
+    lossStreakCurrent: 0,
+  });
+  const [drawdownSeries, setDrawdownSeries] = useState<any[]>([]);
+  const [monthlyPerformance, setMonthlyPerformance] = useState<MonthlyPerformance[]>([]);
   
   const { startDate, endDate, casa, tipo } = useFilterStore();
+  const [activeTab, setActiveTab] = useState<string>("dashboard");
 
-  // KPIs calculados
-  const kpis = useMemo(() => {
-    if (apostas.length === 0) {
-      return {
-        totalApostado: 0,
-        lucro: 0,
-        roi: 0,
-        taxaAcerto: 0,
-        oddMedia: 0,
-        maiorGanho: 0,
-        apostasGanhas: 0,
-        apostasPerdidas: 0,
-      };
+  // Helper: small numeric utilities
+  const sum = (arr: number[]) => arr.reduce((s, v) => s + (v || 0), 0);
+  const mean = (arr: number[]) => (arr.length ? sum(arr) / arr.length : 0);
+
+  // KPIs per tab (return array of 4 KPIs)
+  const kpisForActiveTab = useMemo(() => {
+    // Dashboard KPIs
+    if (activeTab === "dashboard") {
+      const totalApostado = apostas.reduce((s, a) => s + (a.valor_apostado || 0), 0);
+      const resolvidas = apostas.filter((a) => a.resultado && ["Ganhou", "Perdeu", "Cancelado", "Cashout"].includes(a.resultado));
+      const lucro = resolvidas.reduce((s, a) => s + (a.valor_final || 0), 0);
+      const roi = totalApostado > 0 ? (lucro / totalApostado) * 100 : 0;
+      const taxaAcerto = resolvidas.length ? (resolvidas.filter((r) => r.resultado === "Ganhou").length / resolvidas.length) * 100 : 0;
+      return [
+        { title: "Total Apostado", value: formatCurrency(totalApostado), icon: Activity },
+        { title: "Lucro Líquido", value: formatCurrency(lucro), icon: TrendingUp, subtitle: `${resolvidas.filter(r => r.resultado === 'Ganhou').length} ganhas` },
+        { title: "ROI", value: formatPercentage(roi), icon: Target },
+        { title: "Taxa de Acerto", value: formatPercentage(taxaAcerto), icon: Trophy },
+      ];
     }
 
-    const resolvidas = apostas.filter((a) => 
-      a.resultado && ["Ganhou", "Perdeu", "Cancelado", "Cashout"].includes(a.resultado)
-    );
-
-    const totalApostado = apostas.reduce((sum, a) => sum + (a.valor_apostado || 0), 0);
-    const lucro = resolvidas.reduce((sum, a) => sum + (a.valor_final || 0), 0);
-    const apostasGanhas = resolvidas.filter((a) => a.resultado === "Ganhou").length;
-    const apostasPerdidas = resolvidas.filter((a) => a.resultado === "Perdeu").length;
-    const taxaAcerto = resolvidas.length > 0 ? (apostasGanhas / resolvidas.length) * 100 : 0;
-    const roi = totalApostado > 0 ? (lucro / totalApostado) * 100 : 0;
-    const oddMedia = apostas.filter(a => a.odd).length > 0 
-      ? apostas.reduce((sum, a) => sum + (a.odd || 0), 0) / apostas.filter(a => a.odd).length
-      : 0;
-    const maiorGanho = Math.max(0, ...apostas.map((a) => a.valor_final || 0));
-
-    return { totalApostado, lucro, roi, taxaAcerto, oddMedia, maiorGanho, apostasGanhas, apostasPerdidas };
-  }, [apostas]);
-
-  // Insights executivos
-  const executiveInsights = useMemo(() => {
-    const insights = [];
-    
-    if (kpis.roi > 10) {
-      insights.push({ text: "🚀 ROI excelente! Continue com essa estratégia.", type: "success" });
-    } else if (kpis.roi < -10) {
-      insights.push({ text: "⚠️ ROI negativo. Revise sua estratégia de apostas.", type: "error" });
+    // Performance (Casas)
+    if (activeTab === "performance") {
+      const rois = performanceByHouse.map((h) => h.roi);
+      const avgRoi = mean(rois);
+      const topRoi = performanceByHouse[0]?.roi || 0;
+      const totalApostas = sum(performanceByHouse.map((h) => h.apostas));
+      return [
+        { title: "Top ROI Casa", value: formatPercentage(topRoi), icon: Trophy },
+        { title: "ROI Médio", value: formatPercentage(avgRoi), icon: TrendingUp },
+        { title: "Volume (apostas)", value: totalApostas, icon: ActivityIcon },
+        { title: "Casas Analisadas", value: performanceByHouse.length, icon: BarChart3 },
+      ];
     }
 
-    if (kpis.taxaAcerto > 60) {
-      insights.push({ text: "✅ Taxa de acerto acima de 60%. Ótimo desempenho!", type: "success" });
-    } else if (kpis.taxaAcerto < 40) {
-      insights.push({ text: "📉 Taxa de acerto abaixo de 40%. Melhore seletividade.", type: "warning" });
+    // Categorias
+    if (activeTab === "categorias") {
+      const totalApostas = sum(byCategoria.map((c) => c.apostas));
+      const totalLucro = sum(byCategoria.map((c) => c.lucro));
+      const topCat = byCategoria[0]?.name || "-";
+      const roi = totalApostas > 0 ? (totalLucro / totalApostas) * 100 : 0;
+      return [
+        { title: "Categorias (>=10)", value: byCategoria.length, icon: Flame },
+        { title: "Volume (apostas)", value: totalApostas, icon: Activity },
+        { title: "Lucro Total", value: formatCurrency(totalLucro), icon: TrendingUp },
+        { title: "Top Categoria", value: topCat, icon: BarChart3 },
+      ];
     }
 
-    const casaComMelhorRoi = performanceByHouse.length > 0 
-      ? performanceByHouse.sort((a, b) => b.roi - a.roi)[0]
-      : null;
-    if (casaComMelhorRoi) {
-      insights.push({ text: `🏆 Melhor performance: ${casaComMelhorRoi.casa} (ROI: ${casaComMelhorRoi.roi.toFixed(1)}%)`, type: "success" });
+    // Odds
+    if (activeTab === "odds") {
+      const avgOdd = mean(oddSeries.map((o) => o.odd));
+      const bestRange = oddAnalysis.sort((a,b)=>b.roi-a.roi)[0];
+      return [
+        { title: "Odd Média", value: avgOdd ? avgOdd.toFixed(2) : "-", icon: BarChart3 },
+        { title: "Melhor Faixa (ROI)", value: bestRange ? formatPercentage(bestRange.roi) : "-", icon: Target },
+        { title: "Ganhas (melhor faixa)", value: bestRange ? bestRange.won : 0, icon: Trophy },
+        { title: "Faixas Analisadas", value: oddAnalysis.length, icon: Activity },
+      ];
     }
 
-    return insights.slice(0, 6);
-  }, [kpis, performanceByHouse]);
+    // Risco
+    if (activeTab === "risco") {
+      // simple approximations based on series
+      const returns = series.map((s) => s.lucro || 0);
+      const avg = mean(returns);
+      const std = Math.sqrt(mean(returns.map(r => Math.pow(r - avg, 2))));
+      const sharpe = std > 0 ? (avg / std) * Math.sqrt(Math.max(1, returns.length)) : 0;
+      // drawdown
+      let peak = 0, cum = 0, maxDD = 0;
+      returns.forEach((r) => { cum += r; peak = Math.max(peak, cum); maxDD = Math.min(maxDD, cum - peak); });
+      const maxDrawdown = Math.abs(maxDD);
+      return [
+        { title: "Sharpe (approx)", value: sharpe ? sharpe.toFixed(2) : "-", icon: Gauge },
+        { title: "Max Drawdown", value: formatCurrency(maxDrawdown), icon: Shield },
+        { title: "Volatilidade", value: formatCurrency(std), icon: TrendingDown },
+        { title: "Retorno Médio", value: formatCurrency(avg), icon: TrendingUp },
+      ];
+    }
+
+    return [];
+  }, [activeTab, apostas, performanceByHouse, byCategoria, oddSeries, oddAnalysis, series]);
 
   useEffect(() => {
     loadData();
@@ -208,7 +271,10 @@ export default function Analises() {
     const categoriasFormatted = Object.entries(categoriaStats)
       .map(([name, stats]) => ({ name, lucro: stats.lucro, apostas: stats.apostas }))
       .sort((a, b) => b.lucro - a.lucro);
-    setByCategoria(categoriasFormatted);
+
+    // Filtrar apenas categorias com pelo menos 10 aparições
+    const categoriasFiltradas = categoriasFormatted.filter((c) => c.apostas >= 10);
+    setByCategoria(categoriasFiltradas);
 
     // ===== ANÁLISE DE ODDS =====
     const oddRanges: Record<string, { won: number; lost: number; roi_sum: number; prob_sum: number; count: number }> = {
@@ -336,6 +402,85 @@ export default function Analises() {
       })
       .filter((x) => x.apostas > 0);
     setTimePatterns(timePatternFormatted);
+
+    // ===== RISK METRICS & DRAWDOWN =====
+    // Build time-ordered cumulative series (by date)
+    const resolved = dados
+      .filter((a) => a.data)
+      .sort((a, b) => (a.data || "").localeCompare(b.data || ""));
+
+    let cumulative = 0;
+    const cumSeries: { date: string; lucro: number; accumulated: number }[] = [];
+    resolved.forEach((a) => {
+      const profit = a.valor_final || 0;
+      cumulative += profit;
+      cumSeries.push({ date: dayjs(a.data).format("YYYY-MM-DD"), lucro: profit, accumulated: cumulative });
+    });
+
+    // Drawdown series (absolute) based on cumulative
+    let peak = -Infinity;
+    const ddSeries = cumSeries.map((p) => {
+      peak = Math.max(peak, p.accumulated);
+      const drawdown = peak - p.accumulated;
+      return { date: p.date, drawdown };
+    });
+    setDrawdownSeries(ddSeries);
+
+    // Simple risk metrics: sharpe (approx), volatility (std of daily profit), profit factor, streaks
+    const profits = cumSeries.map((s) => s.lucro);
+    const mean = profits.length ? profits.reduce((s, v) => s + v, 0) / profits.length : 0;
+    const variance = profits.length ? profits.reduce((s, v) => s + Math.pow(v - mean, 2), 0) / profits.length : 0;
+    const volatility = Math.sqrt(variance);
+    const sharpe = volatility > 0 ? (mean / volatility) * Math.sqrt(Math.max(1, profits.length)) : 0;
+    const wins = profits.filter((p) => p > 0).reduce((s, v) => s + v, 0);
+    const losses = Math.abs(profits.filter((p) => p < 0).reduce((s, v) => s + v, 0));
+    const profitFactor = losses > 0 ? wins / losses : wins > 0 ? Infinity : 0;
+
+    // streaks
+    let winStreak = 0;
+    let bestWin = 0;
+    let lossStreak = 0;
+    profits.forEach((p) => {
+      if (p > 0) {
+        winStreak += 1;
+        lossStreak = 0;
+      } else if (p < 0) {
+        lossStreak += 1;
+        winStreak = 0;
+      } else {
+        winStreak = 0;
+        lossStreak = 0;
+      }
+      bestWin = Math.max(bestWin, winStreak);
+    });
+
+    setRiskMetrics((r) => ({
+      ...r,
+      maxDrawdown: Math.max(...ddSeries.map((d) => d.drawdown), 0),
+      sharpeRatio: sharpe,
+      volatility,
+      profitFactor,
+      winStreakCurrent: winStreak,
+      winStreakBest: bestWin,
+      lossStreakCurrent: lossStreak,
+    }));
+
+    // Volatility by casa for risk-return scatter
+    const casaVolatility: Record<string, number[]> = {};
+    dados.forEach((a) => {
+      if (!a.casa_de_apostas) return;
+      if (!casaVolatility[a.casa_de_apostas]) casaVolatility[a.casa_de_apostas] = [];
+      casaVolatility[a.casa_de_apostas].push(a.valor_final || 0);
+    });
+
+    const performanceWithVol = performance.map((p) => {
+      const vals = casaVolatility[p.casa] || [];
+      const m = vals.length ? vals.reduce((s, v) => s + v, 0) / vals.length : 0;
+      const vVar = vals.length ? vals.reduce((s, v) => s + Math.pow(v - m, 2), 0) / vals.length : 0;
+      const vol = Math.sqrt(vVar);
+      return { ...p, volatility: vol };
+    });
+    setPerformanceByHouse(performanceWithVol.sort((a, b) => b.roi - a.roi));
   };
 
   const handleLoadingState = (skeleton: boolean) => {
@@ -392,57 +537,48 @@ export default function Analises() {
       </motion.div>
 
       {/* KPIs Principais */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-        <KPICard
-          title="Total Apostado"
-          value={formatCurrency(kpis.totalApostado)}
-          icon={Activity}
-          delay={0.2}
-          isLoading={isLoading}
-        />
-        <KPICard
-          title="Lucro Líquido"
-          value={formatCurrency(kpis.lucro)}
-          icon={TrendingUp}
-          trend={kpis.roi}
-          isLoading={isLoading}
-          delay={0.25}
-          subtitle={`${kpis.apostasGanhas} ganhas, ${kpis.apostasPerdidas} perdidas`}
-        />
-        <KPICard
-          title="ROI"
-          value={formatPercentage(kpis.roi)}
-          icon={Target}
-          trend={kpis.roi}
-          isLoading={isLoading}
-          delay={0.3}
-        />
-        <KPICard
-          title="Taxa de Acerto"
-          value={formatPercentage(kpis.taxaAcerto)}
-          icon={Trophy}
-          trend={kpis.taxaAcerto}
-          isLoading={isLoading}
-          delay={0.35}
-        />
-        <KPICard
-          title="Odd Média"
-          value={kpis.oddMedia.toFixed(2)}
-          icon={BarChart3}
-          isLoading={isLoading}
-          delay={0.4}
-        />
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {kpisForActiveTab.slice(0, 4).map((k, idx) => (
+          <div key={k.title}>
+            <KPICard
+              title={k.title}
+              value={k.value}
+              icon={k.icon || Activity}
+              subtitle={k.subtitle}
+              isLoading={isLoading}
+              delay={0.15 + idx * 0.05}
+            />
+          </div>
+        ))}
       </div>
 
       {/* Tabs Principais */}
-      <Tabs defaultValue="dashboard" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-6 lg:grid-cols-6">
-          <TabsTrigger value="dashboard" className="text-xs sm:text-sm">🏠 Dashboard</TabsTrigger>
-          <TabsTrigger value="performance" className="text-xs sm:text-sm">⚡ Performance</TabsTrigger>
-          <TabsTrigger value="casas" className="text-xs sm:text-sm">🏛️ Casas</TabsTrigger>
-          <TabsTrigger value="categorias" className="text-xs sm:text-sm">🏆 Categorias</TabsTrigger>
-          <TabsTrigger value="odds" className="text-xs sm:text-sm">💹 Odds</TabsTrigger>
-          <TabsTrigger value="risco" className="text-xs sm:text-sm">🛡️ Risco</TabsTrigger>
+      <Tabs defaultValue="dashboard" onValueChange={(v) => setActiveTab(v)} className="space-y-6">
+        <TabsList className="flex gap-2 overflow-x-auto pb-2">
+          <TabsTrigger value="dashboard" className="flex items-center gap-2 px-3 py-2 text-sm">
+            <Zap className="h-4 w-4 text-primary" />
+            <span>Dashboard</span>
+          </TabsTrigger>
+          <TabsTrigger value="performance" className="flex items-center gap-2 px-3 py-2 text-sm">
+            <ActivityIcon className="h-4 w-4 text-accent" />
+            <span>Performance</span>
+          </TabsTrigger>
+          <TabsTrigger value="casas" className="flex items-center gap-2 px-3 py-2 text-sm">
+            <Trophy className="h-4 w-4 text-primary" />
+            <span>Casas</span>
+          </TabsTrigger>
+          <TabsTrigger value="categorias" className="flex items-center gap-2 px-3 py-2 text-sm">
+            <Flame className="h-4 w-4 text-rose-500" />
+            <span>Categorias</span>
+          </TabsTrigger>
+          <TabsTrigger value="odds" className="flex items-center gap-2 px-3 py-2 text-sm">
+            <BarChart3 className="h-4 w-4 text-primary" />
+            <span>Odds</span>
+          </TabsTrigger>
+          <TabsTrigger value="risco" className="flex items-center gap-2 px-3 py-2 text-sm">
+            <Shield className="h-4 w-4 text-destructive" />
+            <span>Risco</span>
+          </TabsTrigger>
         </TabsList>
 
         {/* ===== TAB: DASHBOARD ===== */}
@@ -509,34 +645,31 @@ export default function Analises() {
             </motion.div>
           </div>
 
-          {/* Odd Média Temporal */}
+          {/* Distribuição por Casa (donut) - Dashboard */}
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
             {isLoading ? (
               <Skeleton className="h-[400px] rounded-lg" />
             ) : (
               <Card className="p-6">
-                <CardTitle className="mb-4">Evolução da Odd Média</CardTitle>
+                <CardTitle className="mb-4">Distribuição por Casa (Donut)</CardTitle>
                 <ResponsiveContainer width="100%" height={350}>
-                  <LineChart data={oddSeries}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                    <XAxis dataKey="date" stroke="hsl(var(--muted-foreground))" />
-                    <YAxis stroke="hsl(var(--muted-foreground))" domain={["dataMin - 0.5", "dataMax + 0.5"]} />
+                  <PieChart>
+                    <defs />
+                    <Pie data={byCasa} dataKey="lucro" nameKey="name" innerRadius={80} outerRadius={140} paddingAngle={4}>
+                      {byCasa.map((entry, idx) => (
+                        <Cell key={`cell-${idx}`} fill={idx % 2 === 0 ? 'hsl(var(--primary))' : 'hsl(var(--accent))'} />
+                      ))}
+                    </Pie>
+                    <Legend />
                     <Tooltip
                       contentStyle={{
-                        backgroundColor: "hsl(var(--card))",
-                        border: "1px solid hsl(var(--border))",
-                        borderRadius: "8px",
+                        backgroundColor: 'hsl(var(--card))',
+                        border: '1px solid hsl(var(--border))',
+                        borderRadius: 8,
                       }}
-                      formatter={(value: number) => value.toFixed(2)}
+                      formatter={(value: number) => formatCurrency(value)}
                     />
-                    <Line
-                      type="monotone"
-                      dataKey="odd"
-                      stroke="hsl(var(--primary))"
-                      strokeWidth={2}
-                      dot={{ fill: "hsl(var(--primary))" }}
-                    />
-                  </LineChart>
+                  </PieChart>
                 </ResponsiveContainer>
               </Card>
             )}
@@ -838,6 +971,39 @@ export default function Analises() {
               </Card>
             )}
           </motion.div>
+
+          {/* Evolução da Odd Média (moved to Odds tab) */}
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }}>
+            {isLoading ? (
+              <Skeleton className="h-[320px] rounded-lg" />
+            ) : (
+              <Card className="p-6">
+                <CardTitle className="mb-4">Evolução da Odd Média</CardTitle>
+                <ResponsiveContainer width="100%" height={300}>
+                  <LineChart data={oddSeries}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis dataKey="date" stroke="hsl(var(--muted-foreground))" />
+                    <YAxis stroke="hsl(var(--muted-foreground))" />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: "hsl(var(--card))",
+                        border: "1px solid hsl(var(--border))",
+                        borderRadius: "8px",
+                      }}
+                      formatter={(value: number) => value.toFixed(2)}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="odd"
+                      stroke="hsl(var(--primary))"
+                      strokeWidth={2}
+                      dot={{ fill: "hsl(var(--primary))" }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </Card>
+            )}
+          </motion.div>
         </TabsContent>
 
         {/* ===== TAB: RISCO ===== */}
@@ -871,7 +1037,59 @@ export default function Analises() {
             )}
           </motion.div>
 
-          {/* Padrões Temporais */}
+              {/* Drawdown ao longo do tempo */}
+              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
+                {isLoading ? (
+                  <Skeleton className="h-[300px] rounded-lg" />
+                ) : (
+                  <Card className="p-6">
+                    <CardTitle className="mb-4">Drawdown ao Longo do Tempo</CardTitle>
+                    <ResponsiveContainer width="100%" height={300}>
+                      <AreaChart data={drawdownSeries}>
+                        <defs>
+                          <linearGradient id="ddGradient" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="hsl(var(--destructive))" stopOpacity={0.5} />
+                            <stop offset="95%" stopColor="hsl(var(--destructive))" stopOpacity={0} />
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                        <XAxis dataKey="date" stroke="hsl(var(--muted-foreground))" />
+                        <YAxis stroke="hsl(var(--muted-foreground))" />
+                        <Tooltip
+                          contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8 }}
+                          formatter={(value: number) => formatCurrency(value)}
+                        />
+                        <Area type="monotone" dataKey="drawdown" stroke="hsl(var(--destructive))" fill="url(#ddGradient)" />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  </Card>
+                )}
+              </motion.div>
+
+              {/* Scatter Risk x Return por Casa */}
+              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}>
+                {isLoading ? (
+                  <Skeleton className="h-[300px] rounded-lg" />
+                ) : (
+                  <Card className="p-6">
+                    <CardTitle className="mb-4">Risk x Return (por Casa)</CardTitle>
+                    <ResponsiveContainer width="100%" height={300}>
+                      <ScatterChart>
+                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                        <XAxis dataKey="volatility" name="Volatility" stroke="hsl(var(--muted-foreground))" />
+                        <YAxis dataKey="roi" name="ROI %" stroke="hsl(var(--muted-foreground))" />
+                        <Tooltip
+                          cursor={{ strokeDasharray: '3 3' }}
+                          contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 8 }}
+                        />
+                        <Scatter name="Casas" data={performanceByHouse.map(p => ({ volatility: p.volatility || 0, roi: p.roi, casa: p.casa }))} fill="hsl(var(--primary))" />
+                      </ScatterChart>
+                    </ResponsiveContainer>
+                  </Card>
+                )}
+              </motion.div>
+
+              {/* Padrões Temporais */}
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
             {isLoading ? (
               <Skeleton className="h-[400px] rounded-lg" />
