@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { motion } from "framer-motion";
 import { bookiesService } from "@/services/bookies";
 import { BookieCard } from "@/components/banca/BookieCard";
 import { KPICard } from "@/components/dashboard/KPICard";
+import { TransactionsHistory } from "@/components/banca/TransactionsHistory";
+import { GoalsManager } from "@/components/banca/GoalsManager";
 import { formatCurrency } from "@/lib/utils";
 import { Wallet, TrendingUp, Calendar } from "lucide-react";
 import type { Bookie } from "@/types/betting";
@@ -21,7 +22,8 @@ export default function Banca() {
     setIsLoading(true);
     try {
       const data = await bookiesService.list();
-      setBookies(data);
+      const sorted = data.sort((a, b) => (b.balance || 0) - (a.balance || 0));
+      setBookies(sorted);
     } catch (error) {
       console.error("Erro ao carregar bookies:", error);
     } finally {
@@ -51,58 +53,53 @@ export default function Banca() {
         </div>
       </motion.div>
 
-      <Tabs defaultValue="visao-geral" className="space-y-6">
-        <TabsList>
-          <TabsTrigger value="visao-geral">Visão Geral</TabsTrigger>
-          <TabsTrigger value="casas">Casas ({bookies.length})</TabsTrigger>
-        </TabsList>
+      <div className="space-y-6">
+        <div className="grid gap-4 md:grid-cols-3">
+          <KPICard
+            title="Saldo Total"
+            value={formatCurrency(totalBalance)}
+            icon={Wallet}
+            isLoading={isLoading}
+            delay={0}
+          />
+          <KPICard
+            title="Maior Casa"
+            value={`${maiorCasa?.name || "-"} (${formatCurrency(maiorCasa?.balance || 0)})`}
+            icon={TrendingUp}
+            isLoading={isLoading}
+            delay={0.1}
+          />
+          <KPICard
+            title="Última Atualização"
+            value={maisRecente ? dayjs(maisRecente.last_update).format("DD/MM/YYYY") : "-"}
+            icon={Calendar}
+            isLoading={isLoading}
+            delay={0.2}
+          />
+        </div>
 
-        <TabsContent value="visao-geral" className="space-y-6">
-          <div className="grid gap-4 md:grid-cols-3">
-            <KPICard
-              title="Saldo Total"
-              value={formatCurrency(totalBalance)}
-              icon={Wallet}
-              isLoading={isLoading}
-              delay={0}
-            />
-            <KPICard
-              title="Maior Casa"
-              value={`${maiorCasa?.name || "-"} (${formatCurrency(maiorCasa?.balance || 0)})`}
-              icon={TrendingUp}
-              isLoading={isLoading}
-              delay={0.1}
-            />
-            <KPICard
-              title="Última Atualização"
-              value={maisRecente ? dayjs(maisRecente.last_update).format("DD/MM/YYYY") : "-"}
-              icon={Calendar}
-              isLoading={isLoading}
-              delay={0.2}
-            />
+        <GoalsManager />
+
+        {isLoading ? (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {[...Array(6)].map((_, i) => (
+              <div key={i} className="h-40 bg-muted/50 animate-pulse rounded-xl" />
+            ))}
           </div>
-        </TabsContent>
+        ) : bookies.length > 0 ? (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {bookies.map((bookie) => (
+              <BookieCard key={bookie.id} bookie={bookie} onUpdate={loadBookies} />
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-12 text-muted-foreground">
+            Nenhuma casa de apostas cadastrada
+          </div>
+        )}
 
-        <TabsContent value="casas">
-          {isLoading ? (
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {[...Array(6)].map((_, i) => (
-                <div key={i} className="h-40 bg-muted/50 animate-pulse rounded-xl" />
-              ))}
-            </div>
-          ) : bookies.length > 0 ? (
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {bookies.map((bookie) => (
-                <BookieCard key={bookie.id} bookie={bookie} />
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-12 text-muted-foreground">
-              Nenhuma casa de apostas cadastrada
-            </div>
-          )}
-        </TabsContent>
-      </Tabs>
+        <TransactionsHistory />
+      </div>
     </div>
   );
 }

@@ -61,3 +61,24 @@ export interface DistributionData {
 }
 
 export type ResultadoType = 'Ganhou' | 'Perdeu' | 'Cancelado' | 'Cashout' | 'Pendente';
+
+export type TransactionType = 'deposit' | 'withdraw';
+
+export interface Transaction {
+  id: number;
+  bookie_id: number | null;
+  amount: number | null;
+  type: string;
+  description: string | null;
+  created_at: string | null;
+}
+
+export interface Goal {
+  id: number;
+  daily_goal: number | null;
+  monthly_goal: number | null;
+  loss_limit: number | null;
+  result: boolean | null;
+  created_at: string | null;
+  updated_at: string | null;
+}
