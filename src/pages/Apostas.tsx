@@ -73,7 +73,7 @@ export default function Apostas() {
           casasDisponiveis={casasDisponiveis}
         />
 
-        <ApostasTable data={apostasFiltradas} isLoading={isLoading} />
+  <ApostasTable data={apostasFiltradas} isLoading={isLoading} onReload={loadApostas} />
       </div>
 
       <CreateApostaDialog
