@@ -35,6 +35,58 @@ const formSchema = z.object({
 
 type FormData = z.infer<typeof formSchema>;
 
+const categorias = [
+  "Resultado",
+  "Finalizacoes",
+  "Escanteios",
+  "HT",
+  "FT",
+  "Gols",
+  "Chance Dupla",
+  "Chutes ao Gol",
+  "Ambas Marcam",
+  "Faltas",
+  "Cartoes",
+  "Defesas",
+  "Tiros livres",
+  "Tiros de Meta",
+  "Laterais",
+  "Desarmes",
+  "Impedimentos",
+  "Handicap",
+  "Outros",
+];
+
+const tiposAposta = ["Simples", "Dupla", "Tripla", "Múltipla", "Super Odd"];
+
+const torneios = [
+  "Brasileirao Serie A",
+  "Brasileirao Serie B",
+  "Champions League",
+  "Europa League",
+  "Conference League",
+  "Premier League",
+  "La Liga",
+  "Bundesliga",
+  "Serie A Italia",
+  "Ligue 1",
+  "Copa do Brasil",
+  "Copa Libertadores",
+  "Copa Sul-Americana",
+  "Liga Portugal",
+  "Campeonatos Estaduais",
+  "Data Fifa",
+  "Championship",
+  "FA Cup",
+  "Carabao Cup",
+  "Copa do Rei",
+  "Copa da Alemanha",
+  "Coppa Italia",
+  "Copa da França",
+  "Saudi Pro League",
+  "Süper Lig (Turquia)",
+];
+
 interface EditApostaDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -186,9 +238,11 @@ export function EditApostaDialog({ open, onOpenChange, aposta, onSuccess }: Edit
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="Resultado">Resultado</SelectItem>
-                        <SelectItem value="Gols">Gols</SelectItem>
-                        <SelectItem value="Outros">Outros</SelectItem>
+                        {categorias.map((cat) => (
+                          <SelectItem key={cat} value={cat}>
+                            {cat}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -209,8 +263,11 @@ export function EditApostaDialog({ open, onOpenChange, aposta, onSuccess }: Edit
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="Simples">Simples</SelectItem>
-                        <SelectItem value="Dupla">Dupla</SelectItem>
+                        {tiposAposta.map((t) => (
+                          <SelectItem key={t} value={t}>
+                            {t}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -218,6 +275,117 @@ export function EditApostaDialog({ open, onOpenChange, aposta, onSuccess }: Edit
                 )}
               />
             </div>
+
+            <FormField
+              control={form.control}
+              name="casa_de_apostas"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="flex items-center gap-2">
+                    <Wallet className="h-4 w-4" />
+                    Casa de Apostas
+                  </FormLabel>
+                  <Select
+                    onValueChange={(value) => {
+                      field.onChange(value);
+                      const bookie = bookies.find((b) => b.name === value);
+                      setSelectedBookie(bookie || null);
+                    }}
+                    value={field.value}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione a casa" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {bookies.map((bookie) => (
+                        <SelectItem key={bookie.id} value={bookie.name}>
+                          <div className="flex items-center justify-between w-full">
+                            <span>{bookie.name}</span>
+                            <span className="text-xs text-muted-foreground ml-4">{formatCurrency(bookie.balance || 0)}</span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {selectedBookie && (
+                    <p className="text-xs text-muted-foreground flex items-center gap-1">
+                      <Info className="h-3 w-3" /> Saldo disponível: {formatCurrency(selectedBookie.balance || 0)}
+                    </p>
+                  )}
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <div className="grid md:grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="partida"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Partida</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Ex: Flamengo x Palmeiras" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="torneio"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Torneio</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione o torneio" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {torneios.map((t) => (
+                          <SelectItem key={t} value={t}>
+                            {t}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <FormField
+              control={form.control}
+              name="data"
+              render={({ field }) => (
+                <FormItem className="flex flex-col">
+                  <FormLabel>Data da Aposta</FormLabel>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <FormControl>
+                        <Button
+                          variant="outline"
+                          className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")}
+                        >
+                          {field.value ? format(field.value, "PPP", { locale: ptBR }) : <span>Selecione a data</span>}
+                          <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                        </Button>
+                      </FormControl>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus className={cn("p-3 pointer-events-auto")} />
+                    </PopoverContent>
+                  </Popover>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
             <div className="grid md:grid-cols-2 gap-4">
               <FormField
