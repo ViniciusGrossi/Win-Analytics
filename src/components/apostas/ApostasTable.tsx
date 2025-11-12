@@ -17,13 +17,18 @@ import { formatCurrency, formatDate } from "@/lib/utils";
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Search } from "lucide-react";
 import type { Aposta } from "@/types/betting";
 import { motion } from "framer-motion";
+import { Edit } from "lucide-react";
+import { EditApostaDialog } from "./EditApostaDialog";
 
 interface ApostasTableProps {
   data: Aposta[];
   isLoading?: boolean;
+  onReload?: () => void;
 }
 
-export function ApostasTable({ data, isLoading }: ApostasTableProps) {
+export function ApostasTable({ data, isLoading, onReload }: ApostasTableProps) {
+  const [editOpen, setEditOpen] = useState(false);
+  const [selected, setSelected] = useState<Aposta | null>(null);
   const [sorting, setSorting] = useState<SortingState>([{ id: "data", desc: true }]);
   const [globalFilter, setGlobalFilter] = useState("");
 
@@ -159,6 +164,17 @@ export function ApostasTable({ data, isLoading }: ApostasTableProps) {
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </TableCell>
                   ))}
+                  <TableCell>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => { setSelected(row.original); setEditOpen(true); }}
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </TableCell>
                 </motion.tr>
               ))
             ) : (
@@ -214,6 +230,15 @@ export function ApostasTable({ data, isLoading }: ApostasTableProps) {
           </Button>
         </div>
       </div>
+
+      <EditApostaDialog
+        open={editOpen}
+        onOpenChange={(v) => setEditOpen(v)}
+        aposta={selected}
+        onSuccess={() => {
+          if (onReload) onReload();
+        }}
+      />
     </div>
   );
 }
