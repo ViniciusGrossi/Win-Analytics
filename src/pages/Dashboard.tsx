@@ -9,17 +9,14 @@ import { apostasService } from "@/services/apostas";
 import { useFilterStore } from "@/store/useFilterStore";
 import { formatCurrency, formatPercentage } from "@/lib/utils";
 import type { KPIData, SeriesData } from "@/types/betting";
-import { ApostasTable } from "@/components/apostas/ApostasTable";
-import { ApostasStats } from "@/components/apostas/ApostasStats";
-import { Card, CardContent } from "@/components/ui/card";
 
 export default function Dashboard() {
   const [kpis, setKpis] = useState<KPIData | null>(null);
   const [series, setSeries] = useState<SeriesData[]>([]);
   const [distribution, setDistribution] = useState<{ name: string; value: number }[]>([]);
-  const [lastApostas, setLastApostas] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { startDate, endDate, casa, tipo } = useFilterStore();
+
   useEffect(() => {
     loadData();
   }, [startDate, endDate, casa, tipo]);
@@ -30,7 +27,7 @@ export default function Dashboard() {
       const [kpisData, seriesData, apostas] = await Promise.all([
         apostasService.kpis({ startDate, endDate, casa, tipo }),
         apostasService.series({ startDate, endDate, casa, tipo }),
-        apostasService.list({ startDate, endDate, casa, tipo, limit: 100 }),
+        apostasService.list({ startDate, endDate, casa, tipo }),
       ]);
       
       setKpis(kpisData);
@@ -45,9 +42,6 @@ export default function Dashboard() {
       setDistribution(
         Object.entries(statusCount).map(([name, value]) => ({ name, value }))
       );
-
-      // keep last 5 apostas for "Geral" quick view
-      setLastApostas((apostas.data || []).slice(0, 5));
     } catch (error) {
       console.error("Erro ao carregar dados:", error);
     } finally {
@@ -71,6 +65,8 @@ export default function Dashboard() {
       <Tabs defaultValue="geral" className="space-y-6">
         <TabsList>
           <TabsTrigger value="geral">Geral</TabsTrigger>
+          <TabsTrigger value="casa">Por Casa</TabsTrigger>
+          <TabsTrigger value="tipo">Por Tipo</TabsTrigger>
         </TabsList>
 
         <TabsContent value="geral" className="space-y-6">
@@ -123,27 +119,19 @@ export default function Dashboard() {
             <LucroChart data={series} isLoading={isLoading} />
             <DistributionChart data={distribution} isLoading={isLoading} />
           </div>
+        </TabsContent>
 
-          <div className="space-y-4">
-            <Card className="glass-effect">
-              <CardContent>
-                <h3 className="text-lg font-semibold mb-2">Últimas 5 Apostas</h3>
-                <ApostasTable data={lastApostas} isLoading={isLoading} />
-              </CardContent>
-            </Card>
-
-            <Card className="glass-effect">
-              <CardContent>
-                <h3 className="text-lg font-semibold mb-2">Estatísticas Gerenciais</h3>
-                <ApostasStats apostas={lastApostas} />
-              </CardContent>
-            </Card>
+        <TabsContent value="casa">
+          <div className="text-center py-12 text-muted-foreground">
+            Visualização por casa em desenvolvimento...
           </div>
         </TabsContent>
-        
-        
 
-        
+        <TabsContent value="tipo">
+          <div className="text-center py-12 text-muted-foreground">
+            Visualização por tipo em desenvolvimento...
+          </div>
+        </TabsContent>
       </Tabs>
     </div>
   );
