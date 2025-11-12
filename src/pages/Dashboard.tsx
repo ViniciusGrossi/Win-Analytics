@@ -12,8 +12,6 @@ import type { KPIData, SeriesData } from "@/types/betting";
 import { ApostasTable } from "@/components/apostas/ApostasTable";
 import { ApostasStats } from "@/components/apostas/ApostasStats";
 import { Card, CardContent } from "@/components/ui/card";
-import { CountBarChart } from "@/components/dashboard/CountBarChart";
-import { TopItemsList } from "@/components/dashboard/TopItemsList";
 
 export default function Dashboard() {
   const [kpis, setKpis] = useState<KPIData | null>(null);
