@@ -3,17 +3,22 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Progress } from "@/components/ui/progress";
 import { goalsService } from "@/services/goals";
+import { apostasService } from "@/services/apostas";
 import type { Goal } from "@/types/betting";
 import { toast } from "@/hooks/use-toast";
 import { formatCurrency } from "@/lib/utils";
 import { Target, TrendingUp, TrendingDown, Edit2, Check, X } from "lucide-react";
 import { motion } from "framer-motion";
+import dayjs from "dayjs";
 
 export function GoalsManager() {
   const [goal, setGoal] = useState<Goal | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
+  const [dailyProfit, setDailyProfit] = useState(0);
+  const [monthlyProfit, setMonthlyProfit] = useState(0);
   const [formData, setFormData] = useState({
     daily_goal: 100,
     monthly_goal: 2000,
@@ -22,6 +27,7 @@ export function GoalsManager() {
 
   useEffect(() => {
     loadGoal();
+    loadProfits();
   }, []);
 
   const loadGoal = async () => {
@@ -43,12 +49,37 @@ export function GoalsManager() {
     }
   };
 
+  const loadProfits = async () => {
+    try {
+      const today = dayjs().format("YYYY-MM-DD");
+      const startOfMonth = dayjs().startOf("month").format("YYYY-MM-DD");
+      const endOfMonth = dayjs().endOf("month").format("YYYY-MM-DD");
+
+      // Lucro diário
+      const dailyKpis = await apostasService.kpis({
+        startDate: today,
+        endDate: today,
+      });
+      setDailyProfit(dailyKpis.lucro);
+
+      // Lucro mensal
+      const monthlyKpis = await apostasService.kpis({
+        startDate: startOfMonth,
+        endDate: endOfMonth,
+      });
+      setMonthlyProfit(monthlyKpis.lucro);
+    } catch (error) {
+      console.error("Erro ao carregar lucros:", error);
+    }
+  };
+
   const handleSave = async () => {
     try {
       const updated = await goalsService.upsert(formData);
       setGoal(updated);
       setIsEditing(false);
       toast({ title: "Sucesso", description: "Metas atualizadas com sucesso" });
+      await loadProfits();
     } catch (error) {
       toast({ title: "Erro", description: "Erro ao salvar metas", variant: "destructive" });
     }
@@ -106,7 +137,7 @@ export function GoalsManager() {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="space-y-2"
+            className="space-y-3"
           >
             <Label htmlFor="daily_goal" className="flex items-center gap-2 text-muted-foreground">
               <TrendingUp className="h-4 w-4" />
@@ -122,9 +153,28 @@ export function GoalsManager() {
                 min="0"
               />
             ) : (
-              <p className="text-2xl font-bold text-primary">
-                {formatCurrency(formData.daily_goal)}
-              </p>
+              <>
+                <p className="text-2xl font-bold text-primary">
+                  {formatCurrency(formData.daily_goal)}
+                </p>
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Lucro Hoje:</span>
+                    <span className={dailyProfit >= 0 ? "text-primary font-medium" : "text-destructive font-medium"}>
+                      {formatCurrency(dailyProfit)}
+                    </span>
+                  </div>
+                  <Progress 
+                    value={Math.min(Math.max((dailyProfit / formData.daily_goal) * 100, 0), 100)} 
+                    className="h-2"
+                  />
+                  <p className="text-xs text-muted-foreground text-right">
+                    {dailyProfit >= formData.daily_goal 
+                      ? "Meta atingida! 🎉" 
+                      : `${((dailyProfit / formData.daily_goal) * 100).toFixed(1)}% da meta`}
+                  </p>
+                </div>
+              </>
             )}
           </motion.div>
 
@@ -132,7 +182,7 @@ export function GoalsManager() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
-            className="space-y-2"
+            className="space-y-3"
           >
             <Label htmlFor="monthly_goal" className="flex items-center gap-2 text-muted-foreground">
               <Target className="h-4 w-4" />
@@ -148,9 +198,28 @@ export function GoalsManager() {
                 min="0"
               />
             ) : (
-              <p className="text-2xl font-bold text-primary">
-                {formatCurrency(formData.monthly_goal)}
-              </p>
+              <>
+                <p className="text-2xl font-bold text-primary">
+                  {formatCurrency(formData.monthly_goal)}
+                </p>
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Lucro no Mês:</span>
+                    <span className={monthlyProfit >= 0 ? "text-primary font-medium" : "text-destructive font-medium"}>
+                      {formatCurrency(monthlyProfit)}
+                    </span>
+                  </div>
+                  <Progress 
+                    value={Math.min(Math.max((monthlyProfit / formData.monthly_goal) * 100, 0), 100)} 
+                    className="h-2"
+                  />
+                  <p className="text-xs text-muted-foreground text-right">
+                    {monthlyProfit >= formData.monthly_goal 
+                      ? "Meta atingida! 🎉" 
+                      : `${((monthlyProfit / formData.monthly_goal) * 100).toFixed(1)}% da meta`}
+                  </p>
+                </div>
+              </>
             )}
           </motion.div>
 
@@ -158,11 +227,11 @@ export function GoalsManager() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
-            className="space-y-2"
+            className="space-y-3"
           >
             <Label htmlFor="loss_limit" className="flex items-center gap-2 text-muted-foreground">
               <TrendingDown className="h-4 w-4" />
-              Limite de Perda
+              Limite de Perda Diário
             </Label>
             {isEditing ? (
               <Input
@@ -174,9 +243,33 @@ export function GoalsManager() {
                 min="0"
               />
             ) : (
-              <p className="text-2xl font-bold text-destructive">
-                {formatCurrency(formData.loss_limit)}
-              </p>
+              <>
+                <p className="text-2xl font-bold text-destructive">
+                  {formatCurrency(formData.loss_limit)}
+                </p>
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Perda Hoje:</span>
+                    <span className={dailyProfit < 0 ? "text-destructive font-medium" : "text-muted-foreground"}>
+                      {dailyProfit < 0 ? formatCurrency(Math.abs(dailyProfit)) : "R$ 0,00"}
+                    </span>
+                  </div>
+                  <Progress 
+                    value={dailyProfit < 0 
+                      ? Math.min((Math.abs(dailyProfit) / formData.loss_limit) * 100, 100)
+                      : 0
+                    } 
+                    className={`h-2 ${dailyProfit < 0 && Math.abs(dailyProfit) >= formData.loss_limit * 0.8 ? "[&>div]:bg-destructive" : "[&>div]:bg-amber-500"}`}
+                  />
+                  <p className="text-xs text-muted-foreground text-right">
+                    {dailyProfit >= 0 
+                      ? "Sem perdas hoje" 
+                      : Math.abs(dailyProfit) >= formData.loss_limit
+                        ? "⚠️ Limite atingido!"
+                        : `${((Math.abs(dailyProfit) / formData.loss_limit) * 100).toFixed(1)}% do limite`}
+                  </p>
+                </div>
+              </>
             )}
           </motion.div>
         </div>
