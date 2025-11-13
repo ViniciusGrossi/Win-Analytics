@@ -853,6 +853,7 @@ export default function Analises() {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
 
         {/* ABA 2: PERFORMANCE */}
         <TabsContent value="performance" className="space-y-6">
@@ -1655,40 +1656,99 @@ export default function Analises() {
             <CardHeader>
               <CardTitle>Heatmap de Performance Mensal</CardTitle>
               <CardDescription>
-                Visualize o ROI mensal ao longo dos anos. Passe o mouse sobre um mês para ver o lucro.
+                Visualize o ROI mensal ao longo dos anos. Passe o mouse sobre um mês para ver detalhes.
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="overflow-x-auto">
-                <div className="grid grid-cols-13 gap-2 min-w-max">
-                  <div className="font-semibold text-sm p-2">Ano</div>
-                {/* Usando style para definir 13 colunas, pois o Tailwind não tem `grid-cols-13` por padrão */}
-                <div className="grid gap-2 min-w-max" style={{ gridTemplateColumns: 'repeat(13, minmax(0, 1fr))' }}>
-                  <div className="font-semibold text-sm p-2 text-muted-foreground">Ano</div>
+              <div className="overflow-x-auto pb-4">
+                <div className="grid gap-2 min-w-max" style={{ gridTemplateColumns: 'auto repeat(12, minmax(70px, 1fr))' }}>
+                  {/* Cabeçalho */}
+                  <div className="font-semibold text-sm p-2 text-muted-foreground sticky left-0 bg-card">Ano</div>
                   {['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'].map(mes => (
-                    <div key={mes} className="font-semibold text-sm p-2 text-center">{mes}</div>
+                    <div key={mes} className="font-semibold text-xs p-2 text-center text-muted-foreground">{mes}</div>
                   ))}
-                  
-                  {Array.from(new Set(temporalMetrics.heatmapMensal.map(h => h.ano))).map(ano => (
-                    <>
-                      <div key={ano} className="font-semibold text-sm p-2">{ano}</div>
+
+                  {/* Linhas por ano */}
+                  {Array.from(new Set(temporalMetrics.heatmapMensal.map(h => h.ano))).sort((a, b) => b - a).map(ano => (
+                    <React.Fragment key={ano}>
+                      <div className="font-semibold text-sm p-2 sticky left-0 bg-card">{ano}</div>
                       {Array.from({ length: 12 }, (_, i) => {
                         const data = temporalMetrics.heatmapMensal.find(h => h.ano === ano && h.mes === i);
                         const roi = data?.roi || 0;
-                        const bgColor = roi > 5 ? 'bg-green-500/20' : roi > 0 ? 'bg-yellow-500/20' : roi < 0 ? 'bg-red-500/20' : 'bg-muted';
-                        
+
+                        let bgColor = 'bg-muted/30 border border-border/50';
+                        let textColor = 'text-muted-foreground';
+
+                        if (data) {
+                          if (roi >= 10) {
+                            bgColor = 'bg-green-600/90 border-green-500';
+                            textColor = 'text-white font-bold';
+                          } else if (roi >= 5) {
+                            bgColor = 'bg-green-500/70 border-green-400';
+                            textColor = 'text-white font-semibold';
+                          } else if (roi > 0) {
+                            bgColor = 'bg-green-400/50 border-green-300';
+                            textColor = 'text-green-900 font-medium';
+                          } else if (roi === 0) {
+                            bgColor = 'bg-gray-300/50 border-gray-300';
+                            textColor = 'text-gray-700';
+                          } else if (roi > -5) {
+                            bgColor = 'bg-red-400/50 border-red-300';
+                            textColor = 'text-red-900 font-medium';
+                          } else if (roi > -10) {
+                            bgColor = 'bg-red-500/70 border-red-400';
+                            textColor = 'text-white font-semibold';
+                          } else {
+                            bgColor = 'bg-red-600/90 border-red-500';
+                            textColor = 'text-white font-bold';
+                          }
+                        }
+
                         return (
-                          <div 
-                            key={i} 
-                            className={`p-2 rounded text-center text-sm ${bgColor} cursor-pointer hover:opacity-80 transition-opacity`}
-                            title={data ? `${formatPercentage(roi)} - ${formatCurrency(data.lucro)}` : 'Sem dados'}
+                          <div
+                            key={i}
+                            className={`p-3 rounded text-center text-xs ${bgColor} ${textColor} cursor-pointer hover:scale-105 hover:shadow-md transition-all duration-200 min-h-[50px] flex items-center justify-center`}
+                            title={data ? `${['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'][i]}/${ano}\nROI: ${formatPercentage(roi)}\nLucro: ${formatCurrency(data.lucro)}` : 'Sem dados'}
                           >
                             {data ? formatPercentage(roi) : '—'}
                           </div>
                         );
                       })}
-                    </>
+                    </React.Fragment>
                   ))}
+                </div>
+
+                {/* Legenda */}
+                <div className="mt-6 pt-4 border-t flex flex-wrap items-center gap-4 text-xs">
+                  <span className="text-muted-foreground font-semibold">Legenda:</span>
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded bg-green-600/90 border border-green-500"></div>
+                    <span>≥ 10%</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded bg-green-500/70 border border-green-400"></div>
+                    <span>5% a 10%</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded bg-green-400/50 border border-green-300"></div>
+                    <span>0% a 5%</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded bg-gray-300/50 border border-gray-300"></div>
+                    <span>0%</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded bg-red-400/50 border border-red-300"></div>
+                    <span>-5% a 0%</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded bg-red-500/70 border border-red-400"></div>
+                    <span>-10% a -5%</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded bg-red-600/90 border border-red-500"></div>
+                    <span>&lt; -10%</span>
+                  </div>
                 </div>
               </div>
             </CardContent>
