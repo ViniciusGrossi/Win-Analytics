@@ -1708,3 +1708,5 @@ export default function Analises() {
     </motion.div>
   );
 }
+
+        
