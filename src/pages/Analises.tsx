@@ -1,187 +1,98 @@
-import { useState, useEffect, useMemo } from "react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { apostasService } from "@/services/apostas";
-import { useFilterStore } from "@/store/useFilterStore";
-import { KPICard } from "@/components/dashboard/KPICard";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import {
-  Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis, 
-  Line, LineChart, ComposedChart, Legend, Radar, RadarChart, 
-  PolarGrid, PolarAngleAxis, PolarRadiusAxis, Area, AreaChart, ReferenceLine, PieChart, Pie, Cell
-} from "recharts";
-import { ScatterChart, Scatter } from "recharts";
-import { formatCurrency, formatPercentage } from "@/lib/utils";
+import { apostasService } from "@/services/apostas";
 import type { Aposta, SeriesData } from "@/types/betting";
-import dayjs from "dayjs";
+import { KPICard } from "@/components/dashboard/KPICard";
+import { formatCurrency, formatPercentage } from "@/lib/utils";
+import { useFilterStore } from "@/store/useFilterStore";
 import { 
-  AlertCircle, TrendingUp, TrendingDown, Target, Activity, Zap, Trophy, 
-  BarChart3, Flame, Calendar, Shield, ArrowUp, ArrowDown, Gauge, Clock, Medal
+  useDashboardMetrics, 
+  usePerformanceMetrics, 
+  useRiskMetrics,
+  useOddsMetrics,
+  useTemporalMetrics 
+} from "@/hooks/useAnalysisMetrics";
+import { InfoTooltip } from "@/components/analysis/InfoTooltip";
+import {
+  AreaChart,
+  Area,
+  BarChart,
+  Bar,
+  LineChart,
+  Line,
+  PieChart,
+  Pie,
+  Cell,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip as RechartsTooltip,
+  Legend,
+  ResponsiveContainer,
+  ScatterChart,
+  Scatter,
+  RadarChart,
+  PolarGrid,
+  PolarAngleAxis,
+  PolarRadiusAxis,
+  Radar,
+  ComposedChart,
+} from "recharts";
+import { 
+  TrendingUp, 
+  TrendingDown, 
+  Activity, 
+  Target,
+  DollarSign,
+  Percent,
+  Calendar,
+  Clock,
+  AlertCircle,
+  RefreshCw,
+  BarChart3,
+  PieChart as PieChartIcon,
+  TrendingUpDown,
+  Shield,
+  Zap,
+  Trophy,
+  Medal
 } from "lucide-react";
+import dayjs from "dayjs";
+import 'dayjs/locale/pt-br';
+import relativeTime from 'dayjs/plugin/relativeTime';
 
-// Tipos de dados personalizados
-interface PerformanceMetrics {
-  casa: string;
-  roi: number;
-  lucro: number;
-  taxaAcerto: number;
-  apostas: number;
-  volatility?: number;
-}
+dayjs.locale('pt-br');
+dayjs.extend(relativeTime);
 
-interface OddAnalysis {
-  range: string;
-  won: number;
-  lost: number;
-  roi: number;
-  probability: number;
-}
-
-interface MonthlyPerformance {
-  month: string;
-  roi: number;
-  volume: number;
-  apostas: number;
-  variacao: number;
-  lucro: number;
-}
-
-interface TimePatterns {
-  day: string;
-  period: string;
-  lucro: number;
-  apostas: number;
-}
-
-interface RiskMetrics {
-  maxDrawdown: number;
-  sharpeRatio: number;
-  volatility: number;
-  profitFactor: number;
-}
-
-const CHART_COLORS = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))'];
+const CHART_COLORS = [
+  'hsl(var(--chart-1))', 
+  'hsl(var(--chart-2))', 
+  'hsl(var(--chart-3))', 
+  'hsl(var(--chart-4))', 
+  'hsl(var(--chart-5))'
+];
 
 export default function Analises() {
   const [apostas, setApostas] = useState<Aposta[]>([]);
   const [series, setSeries] = useState<SeriesData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  
-  // Dados processados
-  const [performanceByHouse, setPerformanceByHouse] = useState<PerformanceMetrics[]>([]);
-  const [byCategoria, setByCategoria] = useState<{ name: string; lucro: number; apostas: number; roi: number }[]>([]);
-  const [oddAnalysis, setOddAnalysis] = useState<OddAnalysis[]>([]);
-  const [oddSeries, setOddSeries] = useState<{ date: string; odd: number }[]>([]);
-  const [timePatterns, setTimePatterns] = useState<TimePatterns[]>([]);
-  const [monthlyPerformance, setMonthlyPerformance] = useState<MonthlyPerformance[]>([]);
-  const [riskMetrics, setRiskMetrics] = useState<RiskMetrics>({
-    maxDrawdown: 0,
-    sharpeRatio: 0,
-    volatility: 0,
-    profitFactor: 0,
-  });
+  const [activeTab, setActiveTab] = useState("dashboard");
 
-  const { startDate, endDate, casa, tipo } = useFilterStore();
-  const [activeTab, setActiveTab] = useState<string>("visao-geral");
+  const { startDate, endDate, casa, tipo, resetFilters } = useFilterStore();
 
-  // Helper functions
-  const sum = (arr: number[]) => arr.reduce((s, v) => s + (v || 0), 0);
-  const mean = (arr: number[]) => (arr.length ? sum(arr) / arr.length : 0);
-
-  // KPIs dinâmicos por aba
-  const kpisForActiveTab = useMemo(() => {
-    const totalApostado = apostas.reduce((s, a) => s + (a.valor_apostado || 0), 0);
-    const resolvidas = apostas.filter((a) => a.resultado && ["Ganhou", "Perdeu", "Cancelado", "Cashout"].includes(a.resultado));
-    const lucro = resolvidas.reduce((s, a) => s + (a.valor_final || 0), 0);
-    const roi = totalApostado > 0 ? (lucro / totalApostado) * 100 : 0;
-    const taxaAcerto = resolvidas.length ? (resolvidas.filter((r) => r.resultado === "Ganhou").length / resolvidas.length) * 100 : 0;
-
-    if (activeTab === "visao-geral") {
-      return [
-        { title: "Total Apostado", value: formatCurrency(totalApostado), icon: Activity },
-        { title: "Lucro Líquido", value: formatCurrency(lucro), icon: TrendingUp },
-        { title: "ROI", value: formatPercentage(roi), icon: Target },
-        { title: "Taxa de Acerto", value: formatPercentage(taxaAcerto), icon: Trophy },
-      ];
-    }
-
-    if (activeTab === "casas") {
-      const topCasa = performanceByHouse[0];
-      return [
-        { title: "Top Casa (ROI)", value: topCasa ? formatPercentage(topCasa.roi) : "-", icon: Trophy },
-        { title: "Casas Analisadas", value: performanceByHouse.length, icon: BarChart3 },
-        { title: "Melhor Lucro", value: topCasa ? formatCurrency(topCasa.lucro) : "-", icon: TrendingUp },
-        { title: "Volume (apostas)", value: sum(performanceByHouse.map(h => h.apostas)), icon: Activity },
-      ];
-    }
-
-    if (activeTab === "categorias") {
-      const topCat = byCategoria[0];
-      return [
-        { title: "Top Categoria", value: topCat?.name || "-", icon: Flame },
-        { title: "Categorias (≥10)", value: byCategoria.length, icon: BarChart3 },
-        { title: "Lucro Total", value: formatCurrency(sum(byCategoria.map(c => c.lucro))), icon: TrendingUp },
-        { title: "Volume (apostas)", value: sum(byCategoria.map(c => c.apostas)), icon: Activity },
-      ];
-    }
-
-    if (activeTab === "odds") {
-      const avgOdd = mean(oddSeries.map(o => o.odd));
-      const bestRange = [...oddAnalysis].sort((a,b) => b.roi - a.roi)[0];
-      return [
-        { title: "Odd Média", value: avgOdd ? avgOdd.toFixed(2) : "-", icon: BarChart3 },
-        { title: "Melhor Faixa", value: bestRange?.range || "-", icon: Target },
-        { title: "ROI (melhor faixa)", value: bestRange ? formatPercentage(bestRange.roi) : "-", icon: Trophy },
-        { title: "Faixas Analisadas", value: oddAnalysis.length, icon: Activity },
-      ];
-    }
-
-    if (activeTab === "padroes") {
-      const dayStats = timePatterns.reduce((acc, t) => {
-        if (!acc[t.day]) acc[t.day] = { lucro: 0, apostas: 0 };
-        acc[t.day].lucro += t.lucro;
-        acc[t.day].apostas += t.apostas;
-        return acc;
-      }, {} as Record<string, { lucro: number; apostas: number }>);
-      
-      const bestDay = Object.entries(dayStats).sort((a, b) => b[1].lucro - a[1].lucro)[0];
-      
-      return [
-        { title: "Melhor Dia", value: bestDay?.[0] || "-", icon: Calendar },
-        { title: "Lucro (melhor dia)", value: bestDay ? formatCurrency(bestDay[1].lucro) : "-", icon: TrendingUp },
-        { title: "Padrões Identificados", value: timePatterns.length, icon: Clock },
-        { title: "Volume Total", value: sum(timePatterns.map(t => t.apostas)), icon: Activity },
-      ];
-    }
-
-    if (activeTab === "temporal") {
-      const melhorMes = [...monthlyPerformance].sort((a, b) => b.lucro - a.lucro)[0];
-      return [
-        { title: "Melhor Mês", value: melhorMes?.month || "-", icon: Trophy },
-        { title: "Lucro (melhor mês)", value: melhorMes ? formatCurrency(melhorMes.lucro) : "-", icon: TrendingUp },
-        { title: "Meses Analisados", value: monthlyPerformance.length, icon: Calendar },
-        { title: "Média Mensal", value: formatCurrency(mean(monthlyPerformance.map(m => m.lucro))), icon: BarChart3 },
-      ];
-    }
-
-    if (activeTab === "risco") {
-      return [
-        { title: "Sharpe Ratio", value: riskMetrics.sharpeRatio.toFixed(2), icon: Gauge },
-        { title: "Max Drawdown", value: formatCurrency(riskMetrics.maxDrawdown), icon: Shield },
-        { title: "Volatilidade", value: formatCurrency(riskMetrics.volatility), icon: TrendingDown },
-        { title: "Profit Factor", value: riskMetrics.profitFactor.toFixed(2), icon: Target },
-      ];
-    }
-
-    return [
-      { title: "Total Apostado", value: formatCurrency(totalApostado), icon: Activity },
-      { title: "Lucro Líquido", value: formatCurrency(lucro), icon: TrendingUp },
-      { title: "ROI", value: formatPercentage(roi), icon: Target },
-      { title: "Taxa de Acerto", value: formatPercentage(taxaAcerto), icon: Trophy },
-    ];
-  }, [activeTab, apostas, performanceByHouse, byCategoria, oddSeries, oddAnalysis, timePatterns, monthlyPerformance, riskMetrics]);
+  // Hooks de métricas
+  const dashboardMetrics = useDashboardMetrics(apostas);
+  const performanceMetrics = usePerformanceMetrics(apostas);
+  const riskMetrics = useRiskMetrics(apostas);
+  const oddsMetrics = useOddsMetrics(apostas);
+  const temporalMetrics = useTemporalMetrics(apostas);
 
   useEffect(() => {
     loadData();
@@ -190,516 +101,727 @@ export default function Analises() {
   const loadData = async () => {
     setIsLoading(true);
     try {
-      const result = await apostasService.list({ startDate, endDate, casa, tipo });
-      setApostas(result.data);
+      const params = {
+        startDate: startDate || undefined,
+        endDate: endDate || undefined,
+        casa: casa || undefined,
+        tipo: tipo || undefined,
+      };
 
-      const seriesData = await apostasService.series({ startDate, endDate, casa, tipo });
+      const [apostasData, seriesData] = await Promise.all([
+        apostasService.list(params),
+        apostasService.series(params),
+      ]);
+
+      setApostas(apostasData.data);
       setSeries(seriesData);
-
-      processarDados(result.data, seriesData);
     } catch (error) {
-      console.error("Erro ao carregar análises:", error);
+      console.error("Erro ao carregar dados:", error);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const processarDados = (dados: Aposta[], seriesData: SeriesData[]) => {
-    // ===== PERFORMANCE POR CASA =====
-    const casaStats: Record<string, { lucro: number; apostas: number; valor_apostado: number; ganhas: number }> = {};
-    dados.forEach((a) => {
-      if (!a.casa_de_apostas) return;
-      if (!casaStats[a.casa_de_apostas]) {
-        casaStats[a.casa_de_apostas] = { lucro: 0, apostas: 0, valor_apostado: 0, ganhas: 0 };
-      }
-      casaStats[a.casa_de_apostas].lucro += a.valor_final || 0;
-      casaStats[a.casa_de_apostas].apostas += 1;
-      casaStats[a.casa_de_apostas].valor_apostado += a.valor_apostado || 0;
-      if (a.resultado === "Ganhou") casaStats[a.casa_de_apostas].ganhas += 1;
-    });
+  // Dados para gráficos
+  const equityCurveData = (() => {
+    const sorted = [...apostas]
+      .filter(a => a.resultado && ['Ganhou', 'Perdeu', 'Cashout', 'Cancelado'].includes(a.resultado))
+      .sort((a, b) => dayjs(a.data).diff(dayjs(b.data)));
+    
+    let acumuladoInvestido = 0;
+    let acumuladoSaldo = 0;
 
-    const performance: PerformanceMetrics[] = Object.entries(casaStats).map(([casa, stats]) => ({
-      casa,
-      roi: stats.valor_apostado > 0 ? (stats.lucro / stats.valor_apostado) * 100 : 0,
-      lucro: stats.lucro,
-      taxaAcerto: stats.apostas > 0 ? (stats.ganhas / stats.apostas) * 100 : 0,
-      apostas: stats.apostas,
-    }));
-    setPerformanceByHouse(performance.sort((a, b) => b.roi - a.roi));
-
-    // ===== CATEGORIAS =====
-    const categoriaStats: Record<string, { lucro: number; apostas: number; valor_apostado: number }> = {};
-    dados.forEach((a) => {
-      if (!a.categoria) return;
-      if (!categoriaStats[a.categoria]) categoriaStats[a.categoria] = { lucro: 0, apostas: 0, valor_apostado: 0 };
-      categoriaStats[a.categoria].lucro += a.valor_final || 0;
-      categoriaStats[a.categoria].apostas += 1;
-      categoriaStats[a.categoria].valor_apostado += a.valor_apostado || 0;
-    });
-
-    const categoriasFormatted = Object.entries(categoriaStats)
-      .map(([name, stats]) => ({
-        name,
-        lucro: stats.lucro,
-        apostas: stats.apostas,
-        roi: stats.valor_apostado > 0 ? (stats.lucro / stats.valor_apostado) * 100 : 0,
-      }))
-      .filter(c => c.apostas >= 10)
-      .sort((a, b) => b.lucro - a.lucro);
-    setByCategoria(categoriasFormatted);
-
-    // ===== ANÁLISE DE ODDS =====
-    const oddRanges: Record<string, { won: number; lost: number; roi_sum: number; prob_sum: number; count: number }> = {
-      "1.0-1.5": { won: 0, lost: 0, roi_sum: 0, prob_sum: 0, count: 0 },
-      "1.5-2.0": { won: 0, lost: 0, roi_sum: 0, prob_sum: 0, count: 0 },
-      "2.0-3.0": { won: 0, lost: 0, roi_sum: 0, prob_sum: 0, count: 0 },
-      "3.0-5.0": { won: 0, lost: 0, roi_sum: 0, prob_sum: 0, count: 0 },
-      "5.0+": { won: 0, lost: 0, roi_sum: 0, prob_sum: 0, count: 0 },
-    };
-
-    dados.forEach((a) => {
-      const odd = a.odd || 0;
-      const resolvida = ["Ganhou", "Perdeu"].includes(a.resultado || "");
-      let range = "5.0+";
-      
-      if (odd >= 1.0 && odd < 1.5) range = "1.0-1.5";
-      else if (odd >= 1.5 && odd < 2.0) range = "1.5-2.0";
-      else if (odd >= 2.0 && odd < 3.0) range = "2.0-3.0";
-      else if (odd >= 3.0 && odd < 5.0) range = "3.0-5.0";
-
-      if (resolvida) {
-        if (a.resultado === "Ganhou") oddRanges[range].won += 1;
-        else oddRanges[range].lost += 1;
-        
-        const roi = (a.valor_final || 0) / (a.valor_apostado || 1);
-        oddRanges[range].roi_sum += roi;
-        oddRanges[range].prob_sum += 1 / odd;
-        oddRanges[range].count += 1;
-      }
-    });
-
-    const oddAnalysisFormatted = Object.entries(oddRanges)
-      .map(([range, stats]) => ({
-        range,
-        won: stats.won,
-        lost: stats.lost,
-        roi: stats.count > 0 ? (stats.roi_sum / stats.count) * 100 : 0,
-        probability: stats.count > 0 ? (stats.prob_sum / stats.count) * 100 : 0,
-      }));
-    setOddAnalysis(oddAnalysisFormatted);
-
-    // ===== MÉDIA DE ODDS =====
-    const oddsByDate: Record<string, { total: number; count: number }> = {};
-    dados.forEach((a) => {
-      if (!a.data || !a.odd) return;
-      const date = dayjs(a.data).format("YYYY-MM-DD");
-      if (!oddsByDate[date]) oddsByDate[date] = { total: 0, count: 0 };
-      oddsByDate[date].total += a.odd;
-      oddsByDate[date].count += 1;
-    });
-    const oddSeriesFormatted = Object.entries(oddsByDate)
-      .map(([date, stats]) => ({
-        date: dayjs(date).format("DD/MM"),
-        odd: stats.total / stats.count,
-      }))
-      .sort((a, b) => a.date.localeCompare(b.date));
-    setOddSeries(oddSeriesFormatted);
-
-    // ===== PERFORMANCE MENSAL =====
-    const monthlyStats: Record<string, { lucro: number; apostas: number; valor_apostado: number }> = {};
-    dados.forEach((a) => {
-      if (!a.data) return;
-      const month = dayjs(a.data).format("YYYY-MM");
-      if (!monthlyStats[month]) monthlyStats[month] = { lucro: 0, apostas: 0, valor_apostado: 0 };
-      monthlyStats[month].lucro += a.valor_final || 0;
-      monthlyStats[month].apostas += 1;
-      monthlyStats[month].valor_apostado += a.valor_apostado || 0;
-    });
-
-    const months = Object.keys(monthlyStats).sort();
-    const monthlyFormatted = months.map((month, idx) => {
-      const stats = monthlyStats[month];
-      const prevMonth = idx > 0 ? monthlyStats[months[idx - 1]] : null;
-      const roi = stats.valor_apostado > 0 ? (stats.lucro / stats.valor_apostado) * 100 : 0;
-      const prevRoi = prevMonth && prevMonth.valor_apostado > 0 ? (prevMonth.lucro / prevMonth.valor_apostado) * 100 : 0;
-      const variacao = prevRoi !== 0 ? ((roi - prevRoi) / Math.abs(prevRoi)) * 100 : 0;
+    return sorted.map(a => {
+      acumuladoInvestido += a.valor_apostado || 0;
+      acumuladoSaldo += a.valor_final || 0;
+      const retorno = acumuladoInvestido > 0 ? (acumuladoSaldo / acumuladoInvestido) * 100 : 0;
 
       return {
-        month: dayjs(month).format("MMM/YY"),
-        roi,
-        volume: stats.apostas,
-        apostas: stats.apostas,
-        variacao,
-        lucro: stats.lucro,
+        data: dayjs(a.data).format('DD/MM'),
+        retorno,
+        saldo: acumuladoSaldo,
+        investido: acumuladoInvestido,
       };
     });
-    setMonthlyPerformance(monthlyFormatted);
+  })();
 
-    // ===== PADRÕES TEMPORAIS =====
-    const timePatternMap: Record<string, { lucro: number; apostas: number }> = {};
-    const daysOfWeek = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sab", "Dom"];
-    const periods = ["Madrugada", "Manhã", "Tarde", "Noite"];
+  const lucroMensalData = (() => {
+    const porMes = apostas
+      .filter(a => a.resultado && ['Ganhou', 'Perdeu', 'Cashout', 'Cancelado'].includes(a.resultado))
+      .reduce((acc, a) => {
+        const mes = dayjs(a.data).format('MMM/YY');
+        if (!acc[mes]) acc[mes] = { investido: 0, lucro: 0 };
+        acc[mes].investido += a.valor_apostado || 0;
+        acc[mes].lucro += a.valor_final || 0;
+        return acc;
+      }, {} as Record<string, { investido: number; lucro: number }>);
 
-    daysOfWeek.forEach((day) => {
-      periods.forEach((period) => {
-        timePatternMap[`${day}-${period}`] = { lucro: 0, apostas: 0 };
-      });
-    });
+    return Object.entries(porMes).map(([mes, data]) => ({
+      mes,
+      lucro: data.lucro,
+      roi: data.investido > 0 ? (data.lucro / data.investido) * 100 : 0,
+    }));
+  })();
 
-    dados.forEach((a) => {
-      if (!a.data) return;
-      const date = dayjs(a.data);
-      const dayIdx = date.day() === 0 ? 6 : date.day() - 1;
-      const hour = date.hour();
-      let period = "Madrugada";
-      if (hour >= 6 && hour < 12) period = "Manhã";
-      else if (hour >= 12 && hour < 18) period = "Tarde";
-      else if (hour >= 18 && hour < 24) period = "Noite";
+  const valoresApostadosData = (() => {
+    const faixas = [
+      { label: '0-50', min: 0, max: 50 },
+      { label: '51-100', min: 51, max: 100 },
+      { label: '101-200', min: 101, max: 200 },
+      { label: '201-500', min: 201, max: 500 },
+      { label: '500+', min: 501, max: Infinity },
+    ];
 
-      const key = `${daysOfWeek[dayIdx]}-${period}`;
-      if (timePatternMap[key]) {
-        timePatternMap[key].lucro += a.valor_final || 0;
-        timePatternMap[key].apostas += 1;
-      }
-    });
+    return faixas.map(faixa => ({
+      faixa: faixa.label,
+      count: apostas.filter(a => 
+        (a.valor_apostado || 0) >= faixa.min && (a.valor_apostado || 0) <= faixa.max
+      ).length,
+    }));
+  })();
 
-    const timePatternFormatted = Object.entries(timePatternMap)
-      .map(([key, stats]) => {
-        const [day, period] = key.split("-");
-        return {
-          day: day || "",
-          period: period || "",
-          lucro: stats.lucro,
-          apostas: stats.apostas,
+  const tipoApostaData = (() => {
+    const porTipo = apostas
+      .filter(a => a.tipo_aposta && a.resultado && ['Ganhou', 'Perdeu', 'Cashout', 'Cancelado'].includes(a.resultado))
+      .reduce((acc, a) => {
+        const tipo = a.tipo_aposta || 'Outros';
+        if (!acc[tipo]) acc[tipo] = { investido: 0, lucro: 0 };
+        acc[tipo].investido += a.valor_apostado || 0;
+        acc[tipo].lucro += a.valor_final || 0;
+        return acc;
+      }, {} as Record<string, { investido: number; lucro: number }>);
+
+    return Object.entries(porTipo).map(([tipo, data]) => ({
+      name: tipo,
+      value: data.lucro,
+      roi: data.investido > 0 ? (data.lucro / data.investido) * 100 : 0,
+    }));
+  })();
+
+  const performancePorCasaData = (() => {
+    const porCasa = apostas
+      .filter(a => a.casa_de_apostas && a.resultado && ['Ganhou', 'Perdeu', 'Cashout', 'Cancelado'].includes(a.resultado))
+      .reduce((acc, a) => {
+        const casa = a.casa_de_apostas || 'Outros';
+        if (!acc[casa]) acc[casa] = { 
+          investido: 0, 
+          lucro: 0, 
+          apostas: 0, 
+          vitorias: 0,
+          odds: [] as number[] 
         };
-      })
-      .filter((x) => x.apostas > 0);
-    setTimePatterns(timePatternFormatted);
+        acc[casa].investido += a.valor_apostado || 0;
+        acc[casa].lucro += a.valor_final || 0;
+        acc[casa].apostas += 1;
+        if (a.resultado === 'Ganhou') acc[casa].vitorias += 1;
+        if (a.odd) acc[casa].odds.push(a.odd);
+        return acc;
+      }, {} as Record<string, { investido: number; lucro: number; apostas: number; vitorias: number; odds: number[] }>);
 
-    // ===== RISK METRICS =====
-    const returns = seriesData.map(s => s.lucro || 0);
-    const avg = mean(returns);
-    const std = Math.sqrt(mean(returns.map(r => Math.pow(r - avg, 2))));
-    const sharpe = std > 0 ? (avg / std) * Math.sqrt(Math.max(1, returns.length)) : 0;
+    return Object.entries(porCasa).map(([casa, data]) => ({
+      casa,
+      lucro: data.lucro,
+      roi: data.investido > 0 ? (data.lucro / data.investido) * 100 : 0,
+      taxaAcerto: data.apostas > 0 ? (data.vitorias / data.apostas) * 100 : 0,
+      apostas: data.apostas,
+      oddMedia: data.odds.length > 0 ? data.odds.reduce((s, o) => s + o, 0) / data.odds.length : 0,
+    })).sort((a, b) => b.roi - a.roi);
+  })();
 
-    let peak = 0, cum = 0, maxDD = 0;
-    returns.forEach((r) => {
-      cum += r;
-      peak = Math.max(peak, cum);
-      maxDD = Math.min(maxDD, cum - peak);
+  const categoriaData = (() => {
+    const apostasComCategoria = apostas.filter(a => 
+      a.categoria && 
+      a.resultado && 
+      ['Ganhou', 'Perdeu', 'Cashout', 'Cancelado'].includes(a.resultado)
+    );
+
+    const porCategoria = apostasComCategoria.reduce((acc, a) => {
+      const categorias = (a.categoria || '').split(/[,;]/).map(c => c.trim()).filter(Boolean);
+      
+      categorias.forEach(cat => {
+        if (!acc[cat]) acc[cat] = { 
+          investido: 0, 
+          lucro: 0, 
+          apostas: 0, 
+          vitorias: 0,
+          odds: [] as number[] 
+        };
+        acc[cat].investido += a.valor_apostado || 0;
+        acc[cat].lucro += a.valor_final || 0;
+        acc[cat].apostas += 1;
+        if (a.resultado === 'Ganhou') acc[cat].vitorias += 1;
+        if (a.odd) acc[cat].odds.push(a.odd);
+      });
+
+      return acc;
+    }, {} as Record<string, { investido: number; lucro: number; apostas: number; vitorias: number; odds: number[] }>);
+
+    return Object.entries(porCategoria)
+      .filter(([, data]) => data.apostas >= 3)
+      .map(([categoria, data]) => ({
+        categoria,
+        lucro: data.lucro,
+        roi: data.investido > 0 ? (data.lucro / data.investido) * 100 : 0,
+        taxaAcerto: data.apostas > 0 ? (data.vitorias / data.apostas) * 100 : 0,
+        apostas: data.apostas,
+        oddMedia: data.odds.length > 0 ? data.odds.reduce((s, o) => s + o, 0) / data.odds.length : 0,
+      }))
+      .sort((a, b) => b.lucro - a.lucro);
+  })();
+
+  const oddsRangeData = (() => {
+    const faixas = [
+      { label: '1.0-1.5', min: 1.0, max: 1.5 },
+      { label: '1.5-2.0', min: 1.5, max: 2.0 },
+      { label: '2.0-3.0', min: 2.0, max: 3.0 },
+      { label: '3.0+', min: 3.0, max: Infinity },
+    ];
+
+    const apostasResolvidas = apostas.filter(a => 
+      a.odd &&
+      a.resultado && 
+      ['Ganhou', 'Perdeu', 'Cashout', 'Cancelado'].includes(a.resultado)
+    );
+
+    return faixas.map(faixa => {
+      const apostasNaFaixa = apostasResolvidas.filter(a => 
+        (a.odd || 0) >= faixa.min && (a.odd || 0) < faixa.max
+      );
+
+      const investido = apostasNaFaixa.reduce((s, a) => s + (a.valor_apostado || 0), 0);
+      const lucro = apostasNaFaixa.reduce((s, a) => s + (a.valor_final || 0), 0);
+      const vitorias = apostasNaFaixa.filter(a => a.resultado === 'Ganhou').length;
+
+      return {
+        faixa: faixa.label,
+        taxaAcerto: apostasNaFaixa.length > 0 ? (vitorias / apostasNaFaixa.length) * 100 : 0,
+        roi: investido > 0 ? (lucro / investido) * 100 : 0,
+        count: apostasNaFaixa.length,
+      };
     });
+  })();
 
-    const wins = returns.filter(r => r > 0);
-    const losses = returns.filter(r => r < 0);
-    const profitFactor = losses.length > 0 ? Math.abs(sum(wins) / sum(losses)) : 0;
+  const performanceDiaSemanaData = (() => {
+    const porDia = apostas
+      .filter(a => a.resultado && ['Ganhou', 'Perdeu', 'Cashout', 'Cancelado'].includes(a.resultado))
+      .reduce((acc, a) => {
+        const dia = dayjs(a.data).format('dddd');
+        if (!acc[dia]) acc[dia] = { lucro: 0, apostas: 0 };
+        acc[dia].lucro += a.valor_final || 0;
+        acc[dia].apostas += 1;
+        return acc;
+      }, {} as Record<string, { lucro: number; apostas: number }>);
 
-    setRiskMetrics({
-      maxDrawdown: Math.abs(maxDD),
-      sharpeRatio: sharpe,
-      volatility: std,
-      profitFactor,
-    });
-  };
+    const diasOrdem = ['domingo', 'segunda-feira', 'terça-feira', 'quarta-feira', 'quinta-feira', 'sexta-feira', 'sábado'];
+
+    return diasOrdem.map(dia => ({
+      dia: dia.charAt(0).toUpperCase() + dia.slice(1, 3),
+      lucro: porDia[dia]?.lucro || 0,
+      apostas: porDia[dia]?.apostas || 0,
+    }));
+  })();
 
   if (isLoading) {
     return (
       <div className="container mx-auto p-6 space-y-6">
         <Skeleton className="h-12 w-64" />
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {[1, 2, 3, 4].map((i) => (
-            <Skeleton key={i} className="h-32" />
-          ))}
+          {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-32" />)}
         </div>
+        <Skeleton className="h-96" />
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-      >
-        <h1 className="text-4xl font-bold text-foreground mb-2">Análises Avançadas</h1>
-        <p className="text-muted-foreground">Insights profundos sobre suas apostas</p>
-      </motion.div>
-
-      {/* KPIs da Aba Ativa */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {kpisForActiveTab.map((kpi, idx) => (
-          <motion.div
-            key={idx}
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.3, delay: idx * 0.1 }}
-          >
-            <KPICard {...kpi} />
-          </motion.div>
-        ))}
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      className="container mx-auto p-4 md:p-6 space-y-6"
+    >
+      {/* Header */}
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+          <h1 className="text-3xl md:text-4xl font-bold flex items-center gap-2">
+            <BarChart3 className="w-8 h-8 text-primary" />
+            Análises Avançadas
+          </h1>
+          <p className="text-muted-foreground mt-1">
+            Insights profundos sobre suas apostas
+          </p>
+        </div>
+        <div className="flex items-center gap-3">
+          <Badge variant="outline" className="gap-1">
+            <Activity className="w-3 h-3" />
+            Online
+          </Badge>
+          <Button onClick={loadData} variant="outline" size="sm">
+            <RefreshCw className="w-4 h-4 mr-2" />
+            Atualizar
+          </Button>
+          <Button onClick={resetFilters} variant="ghost" size="sm">
+            Limpar Filtros
+          </Button>
+        </div>
       </div>
 
       {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-3 lg:grid-cols-9 gap-2">
-          <TabsTrigger value="visao-geral">📈 Visão Geral</TabsTrigger>
-          <TabsTrigger value="casas">🏆 Casas</TabsTrigger>
-          <TabsTrigger value="categorias">🎯 Categorias</TabsTrigger>
-          <TabsTrigger value="odds">💹 Odds</TabsTrigger>
-          <TabsTrigger value="padroes">⏰ Padrões</TabsTrigger>
-          <TabsTrigger value="temporal">📊 Temporal</TabsTrigger>
-          <TabsTrigger value="risco">🛡️ Risco</TabsTrigger>
-          <TabsTrigger value="tipos">🎲 Tipos</TabsTrigger>
-          <TabsTrigger value="insights">💎 Insights</TabsTrigger>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+        <TabsList className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-2 h-auto p-1">
+          <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
+          <TabsTrigger value="performance">Performance</TabsTrigger>
+          <TabsTrigger value="casas">Casas</TabsTrigger>
+          <TabsTrigger value="categorias">Categorias</TabsTrigger>
+          <TabsTrigger value="odds">Odds</TabsTrigger>
+          <TabsTrigger value="risco">Risco</TabsTrigger>
+          <TabsTrigger value="temporal">Temporal</TabsTrigger>
+          <TabsTrigger value="padroes">Padrões</TabsTrigger>
         </TabsList>
 
-        {/* ABA 1: VISÃO GERAL */}
-        <TabsContent value="visao-geral" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Evolução do Lucro Acumulado</CardTitle>
-              <CardDescription>Progressão temporal do seu desempenho</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={350}>
-                <AreaChart data={series}>
-                  <defs>
-                    <linearGradient id="colorLucro" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="hsl(var(--chart-1))" stopOpacity={0.8}/>
-                      <stop offset="95%" stopColor="hsl(var(--chart-1))" stopOpacity={0}/>
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis dataKey="date" stroke="hsl(var(--muted-foreground))" />
-                  <YAxis stroke="hsl(var(--muted-foreground))" />
-                  <Tooltip 
-                    contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }}
-                    formatter={(value: number) => formatCurrency(value)}
-                  />
-                  <Area type="monotone" dataKey="lucro" stroke="hsl(var(--chart-1))" fillOpacity={1} fill="url(#colorLucro)" />
-                </AreaChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
+        {/* ABA 1: DASHBOARD */}
+        <TabsContent value="dashboard" className="space-y-6">
+          {/* KPIs Principais */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <KPICard
+              title="Total Investido"
+              value={formatCurrency(dashboardMetrics.totalInvestido)}
+              icon={DollarSign}
+              trend={dashboardMetrics.totalInvestidoVariacao}
+              description={`${dashboardMetrics.totalInvestidoVariacao > 0 ? '+' : ''}${formatPercentage(dashboardMetrics.totalInvestidoVariacao)} vs período anterior`}
+            />
+            <KPICard
+              title="ROI"
+              value={formatPercentage(dashboardMetrics.roi)}
+              icon={Percent}
+              description={dashboardMetrics.roiStatus}
+              variant={dashboardMetrics.roiStatus === 'Excelente' ? 'success' : dashboardMetrics.roiStatus === 'Positivo' ? 'warning' : 'destructive'}
+            />
+            <KPICard
+              title="Lucro/Prejuízo"
+              value={formatCurrency(dashboardMetrics.lucroTotal)}
+              icon={TrendingUp}
+              description={`Maior ganho: ${formatCurrency(dashboardMetrics.maiorGanho.valor)}`}
+              variant={dashboardMetrics.lucroTotal > 0 ? 'success' : 'destructive'}
+            />
+            <KPICard
+              title="Taxa de Acerto"
+              value={formatPercentage(dashboardMetrics.taxaAcerto)}
+              icon={Target}
+              description={dashboardMetrics.taxaStatus}
+              variant={dashboardMetrics.taxaStatus === 'Excelente' ? 'success' : dashboardMetrics.taxaStatus === 'Bom' ? 'warning' : 'destructive'}
+            />
+          </div>
 
+          {/* Gráficos Principais */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card>
               <CardHeader>
-                <CardTitle>Distribuição por Casa</CardTitle>
+                <CardTitle className="flex items-center gap-2">
+                  Evolução do Retorno Acumulado
+                  <InfoTooltip 
+                    title="Equity Curve"
+                    description="Mostra a evolução percentual do seu retorno acumulado ao longo do tempo"
+                  />
+                </CardTitle>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={300}>
-                  <PieChart>
-                    <Pie
-                      data={performanceByHouse.slice(0, 5).map(h => ({ ...h }))}
-                      dataKey="apostas"
-                      nameKey="casa"
-                      cx="50%"
-                      cy="50%"
-                      outerRadius={100}
-                      label
-                    >
-                      {performanceByHouse.slice(0, 5).map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip formatter={(value: number) => `${value} apostas`} />
-                  </PieChart>
+                  <AreaChart data={equityCurveData}>
+                    <defs>
+                      <linearGradient id="colorRetorno" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor={CHART_COLORS[0]} stopOpacity={0.8}/>
+                        <stop offset="95%" stopColor={CHART_COLORS[0]} stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis dataKey="data" stroke="hsl(var(--muted-foreground))" />
+                    <YAxis stroke="hsl(var(--muted-foreground))" />
+                    <RechartsTooltip 
+                      contentStyle={{ backgroundColor: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))' }}
+                      formatter={(value: number) => formatPercentage(value)}
+                    />
+                    <Area 
+                      type="monotone" 
+                      dataKey="retorno" 
+                      stroke={CHART_COLORS[0]} 
+                      fillOpacity={1} 
+                      fill="url(#colorRetorno)" 
+                    />
+                  </AreaChart>
                 </ResponsiveContainer>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader>
-                <CardTitle>Apostas Ganhas vs Perdidas</CardTitle>
+                <CardTitle>Evolução do Lucro Mensal</CardTitle>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={monthlyPerformance.slice(-6)}>
+                  <ComposedChart data={lucroMensalData}>
                     <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                    <XAxis dataKey="month" stroke="hsl(var(--muted-foreground))" />
-                    <YAxis stroke="hsl(var(--muted-foreground))" />
-                    <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }} />
+                    <XAxis dataKey="mes" stroke="hsl(var(--muted-foreground))" />
+                    <YAxis yAxisId="left" stroke="hsl(var(--muted-foreground))" />
+                    <YAxis yAxisId="right" orientation="right" stroke="hsl(var(--muted-foreground))" />
+                    <RechartsTooltip 
+                      contentStyle={{ backgroundColor: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))' }}
+                    />
                     <Legend />
-                    <Bar dataKey="apostas" fill="hsl(var(--chart-1))" name="Total Apostas" />
-                  </BarChart>
+                    <Bar yAxisId="left" dataKey="lucro" fill={CHART_COLORS[0]} name="Lucro (R$)" />
+                    <Line yAxisId="right" type="monotone" dataKey="roi" stroke={CHART_COLORS[1]} name="ROI (%)" />
+                  </ComposedChart>
                 </ResponsiveContainer>
               </CardContent>
             </Card>
           </div>
-        </TabsContent>
 
-        {/* ABA 2: CASAS DE APOSTAS */}
-        <TabsContent value="casas" className="space-y-6">
+          {/* Estatísticas Rápidas */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <Activity className="w-4 h-4" />
+                  Atividade
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Total de Apostas</span>
+                  <span className="font-semibold">{dashboardMetrics.totalApostas}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Apostas/Dia</span>
+                  <span className="font-semibold">{dashboardMetrics.apostasPorDia.toFixed(1)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Dias Ativos</span>
+                  <span className="font-semibold">{dashboardMetrics.diasAtivos}</span>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <Target className="w-4 h-4" />
+                  Odds
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Odd Média</span>
+                  <span className="font-semibold">{dashboardMetrics.oddMedia.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Odd Mais Alta</span>
+                  <span className="font-semibold">{dashboardMetrics.oddMaisAlta.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Odd Mais Baixa</span>
+                  <span className="font-semibold">{dashboardMetrics.oddMaisBaixa.toFixed(2)}</span>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <Zap className="w-4 h-4" />
+                  Sequências
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Maior Seq. Vitórias</span>
+                  <span className="font-semibold text-green-600">{dashboardMetrics.maiorSequenciaVitorias}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Maior Seq. Derrotas</span>
+                  <span className="font-semibold text-red-600">{dashboardMetrics.maiorSequenciaDerrotas}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Sequência Atual</span>
+                  <span className={`font-semibold ${dashboardMetrics.sequenciaAtual > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    {dashboardMetrics.sequenciaAtual > 0 ? `+${dashboardMetrics.sequenciaAtual}` : dashboardMetrics.sequenciaAtual}
+                  </span>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Distribuições */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Distribuição de Valores Apostados</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={250}>
+                  <BarChart data={valoresApostadosData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis dataKey="faixa" stroke="hsl(var(--muted-foreground))" />
+                    <YAxis stroke="hsl(var(--muted-foreground))" />
+                    <RechartsTooltip 
+                      contentStyle={{ backgroundColor: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))' }}
+                    />
+                    <Bar dataKey="count" fill={CHART_COLORS[2]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Lucratividade por Tipo de Aposta</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={250}>
+                  <PieChart>
+                    <Pie
+                      data={tipoApostaData}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                      outerRadius={80}
+                      fill="#8884d8"
+                      dataKey="value"
+                    >
+                      {tipoApostaData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <RechartsTooltip 
+                      contentStyle={{ backgroundColor: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))' }}
+                      formatter={(value: number) => formatCurrency(value)}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Insights */}
           <Card>
             <CardHeader>
-              <CardTitle>Ranking de Casas (Top 10)</CardTitle>
-              <CardDescription>Ordenadas por ROI</CardDescription>
+              <CardTitle className="flex items-center gap-2">
+                <Trophy className="w-5 h-5" />
+                Insights
+              </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-3">
-                {performanceByHouse.slice(0, 10).map((casa, idx) => (
-                  <div key={casa.casa} className="flex items-center gap-4 p-3 rounded-lg bg-muted/50">
-                    <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary text-primary-foreground font-bold">
-                      {idx + 1}
-                    </div>
-                    <div className="flex-1">
-                      <p className="font-semibold text-foreground">{casa.casa}</p>
-                      <p className="text-sm text-muted-foreground">{casa.apostas} apostas</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-bold text-lg text-foreground">{formatPercentage(casa.roi)}</p>
-                      <p className="text-sm text-muted-foreground">{formatCurrency(casa.lucro)}</p>
-                    </div>
-                  </div>
-                ))}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {dashboardMetrics.roi >= 5 && (
+                  <Alert>
+                    <TrendingUp className="h-4 w-4" />
+                    <AlertDescription>
+                      <strong>Excelente Performance!</strong> Seu ROI de {formatPercentage(dashboardMetrics.roi)} está acima da média.
+                    </AlertDescription>
+                  </Alert>
+                )}
+                {dashboardMetrics.taxaAcerto >= 60 && (
+                  <Alert>
+                    <Target className="h-4 w-4" />
+                    <AlertDescription>
+                      <strong>Alta Precisão!</strong> Taxa de acerto de {formatPercentage(dashboardMetrics.taxaAcerto)} é excelente.
+                    </AlertDescription>
+                  </Alert>
+                )}
+                {dashboardMetrics.apostasPorDia > 3 && (
+                  <Alert>
+                    <Activity className="h-4 w-4" />
+                    <AlertDescription>
+                      <strong>Alto Volume!</strong> Média de {dashboardMetrics.apostasPorDia.toFixed(1)} apostas por dia.
+                    </AlertDescription>
+                  </Alert>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ABA 2: PERFORMANCE */}
+        <TabsContent value="performance" className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <KPICard
+              title="Yield"
+              value={formatPercentage(performanceMetrics.yield)}
+              icon={Percent}
+              description="Retorno sobre investimento"
+            />
+            <KPICard
+              title="Consistência ROI"
+              value={formatPercentage(performanceMetrics.consistenciaROI)}
+              icon={TrendingUpDown}
+              description="Meses lucrativos"
+            />
+            <KPICard
+              title="Strike Rate (Odds Altas)"
+              value={formatPercentage(performanceMetrics.strikeRateOddsAltas)}
+              icon={Target}
+              description="Acerto em odds > 2.0"
+            />
+            <KPICard
+              title="Apostas/Mês"
+              value={performanceMetrics.apostasPorMes.toFixed(1)}
+              icon={Calendar}
+              description="Média mensal"
+            />
+          </div>
+
+          {/* Análise Temporal */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Análise Temporal</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground">Melhor Mês</p>
+                  <p className="text-2xl font-bold">{performanceMetrics.melhorMes.mes}</p>
+                  <p className="text-sm text-green-600">ROI: {formatPercentage(performanceMetrics.melhorMes.roi)}</p>
+                </div>
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground">Pior Mês</p>
+                  <p className="text-2xl font-bold">{performanceMetrics.piorMes.mes}</p>
+                  <p className="text-sm text-red-600">ROI: {formatPercentage(performanceMetrics.piorMes.roi)}</p>
+                </div>
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground">ROI Mês Atual</p>
+                  <p className={`text-2xl font-bold ${performanceMetrics.roiMesAtual > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    {formatPercentage(performanceMetrics.roiMesAtual)}
+                  </p>
+                </div>
               </div>
             </CardContent>
           </Card>
 
+          {/* Otimização */}
           <Card>
             <CardHeader>
-              <CardTitle>Radar Comparativo (Top 5)</CardTitle>
+              <CardTitle>Otimização</CardTitle>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={400}>
-                <RadarChart data={performanceByHouse.slice(0, 5).map(h => ({
-                  casa: h.casa,
-                  ROI: h.roi,
-                  "Taxa Acerto": h.taxaAcerto,
-                  Apostas: h.apostas,
-                }))}>
-                  <PolarGrid stroke="hsl(var(--border))" />
-                  <PolarAngleAxis dataKey="casa" stroke="hsl(var(--foreground))" />
-                  <PolarRadiusAxis stroke="hsl(var(--muted-foreground))" />
-                  <Radar name="Performance" dataKey="ROI" stroke="hsl(var(--chart-1))" fill="hsl(var(--chart-1))" fillOpacity={0.6} />
-                  <Tooltip />
-                </RadarChart>
-              </ResponsiveContainer>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground flex items-center gap-1">
+                    Odd Ótima
+                    <InfoTooltip 
+                      title="Faixa de Odd Ideal"
+                      description="Faixa de odds com melhor ROI (mínimo 5 apostas)"
+                    />
+                  </p>
+                  <p className="text-xl font-bold">{performanceMetrics.oddOtima.faixa}</p>
+                  <p className="text-sm text-green-600">ROI: {formatPercentage(performanceMetrics.oddOtima.roi)}</p>
+                </div>
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground">Volume Ideal</p>
+                  <p className="text-xl font-bold">{formatCurrency(performanceMetrics.volumeIdeal)}</p>
+                  <p className="text-sm text-muted-foreground">Por mês</p>
+                </div>
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground">ROI Projetado</p>
+                  <p className="text-xl font-bold">{formatPercentage(performanceMetrics.roiProjetado)}</p>
+                  <p className="text-sm text-muted-foreground">Na odd ótima</p>
+                </div>
+              </div>
             </CardContent>
           </Card>
 
+          {/* Eficiência */}
           <Card>
             <CardHeader>
-              <CardTitle>Evolução do Lucro por Casa</CardTitle>
+              <CardTitle>Métricas de Eficiência</CardTitle>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={350}>
-                <LineChart data={series}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis dataKey="date" stroke="hsl(var(--muted-foreground))" />
-                  <YAxis stroke="hsl(var(--muted-foreground))" />
-                  <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }} formatter={(value: number) => formatCurrency(value)} />
-                  <Legend />
-                  <Line type="monotone" dataKey="lucro" stroke="hsl(var(--chart-1))" strokeWidth={2} />
-                </LineChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* ABA 3: CATEGORIAS */}
-        <TabsContent value="categorias" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Lucro por Categoria (≥10 apostas)</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={400}>
-                <BarChart data={byCategoria.slice(0, 10)} layout="vertical">
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis type="number" stroke="hsl(var(--muted-foreground))" />
-                  <YAxis dataKey="name" type="category" stroke="hsl(var(--muted-foreground))" width={100} />
-                  <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }} formatter={(value: number) => formatCurrency(value)} />
-                  <Bar dataKey="lucro" fill="hsl(var(--chart-2))" />
-                </BarChart>
-              </ResponsiveContainer>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground">Precisão</p>
+                  <p className="text-2xl font-bold">{formatPercentage(performanceMetrics.precisao)}</p>
+                </div>
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground">Recall</p>
+                  <p className="text-2xl font-bold">{formatPercentage(performanceMetrics.recall)}</p>
+                </div>
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground">F1-Score</p>
+                  <p className="text-2xl font-bold">{formatPercentage(performanceMetrics.f1Score)}</p>
+                </div>
+              </div>
             </CardContent>
           </Card>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* KPIs Avançados */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <Card>
-              <CardHeader>
-                <CardTitle>Distribuição de Apostas</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
-                  <PieChart>
-                    <Pie
-                      data={byCategoria.slice(0, 8)}
-                      dataKey="apostas"
-                      nameKey="name"
-                      cx="50%"
-                      cy="50%"
-                      outerRadius={100}
-                      label
-                    >
-                      {byCategoria.slice(0, 8).map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip />
-                  </PieChart>
-                </ResponsiveContainer>
+              <CardContent className="pt-6">
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground flex items-center gap-1">
+                    Sharpe Ratio
+                    <InfoTooltip 
+                      title="Sharpe Ratio"
+                      description="Retorno médio dividido pelo desvio padrão. Quanto maior, melhor o risco-retorno."
+                    />
+                  </p>
+                  <p className="text-2xl font-bold">{performanceMetrics.sharpeRatio.toFixed(2)}</p>
+                </div>
               </CardContent>
             </Card>
-
             <Card>
-              <CardHeader>
-                <CardTitle>ROI vs Taxa de Acerto</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={byCategoria.slice(0, 8)}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                    <XAxis dataKey="name" stroke="hsl(var(--muted-foreground))" />
-                    <YAxis stroke="hsl(var(--muted-foreground))" />
-                    <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }} />
-                    <Legend />
-                    <Bar dataKey="roi" fill="hsl(var(--chart-1))" name="ROI (%)" />
-                  </BarChart>
-                </ResponsiveContainer>
+              <CardContent className="pt-6">
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground flex items-center gap-1">
+                    Sortino Ratio
+                    <InfoTooltip 
+                      title="Sortino Ratio"
+                      description="Similar ao Sharpe, mas considera apenas a volatilidade negativa."
+                    />
+                  </p>
+                  <p className="text-2xl font-bold">{performanceMetrics.sortinoRatio.toFixed(2)}</p>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6">
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground flex items-center gap-1">
+                    Calmar Ratio
+                    <InfoTooltip 
+                      title="Calmar Ratio"
+                      description="ROI dividido pelo máximo drawdown. Mede retorno vs risco de grandes perdas."
+                    />
+                  </p>
+                  <p className="text-2xl font-bold">{performanceMetrics.calmarRatio.toFixed(2)}</p>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6">
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground">Win/Loss Ratio</p>
+                  <p className="text-2xl font-bold">{performanceMetrics.winLossRatio.toFixed(2)}</p>
+                </div>
               </CardContent>
             </Card>
           </div>
-        </TabsContent>
 
-        {/* ABA 4: ANÁLISE DE ODDS */}
-        <TabsContent value="odds" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>ROI por Faixa de Odd</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={350}>
-                <BarChart data={oddAnalysis}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis dataKey="range" stroke="hsl(var(--muted-foreground))" />
-                  <YAxis stroke="hsl(var(--muted-foreground))" />
-                  <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }} formatter={(value: number) => `${value.toFixed(2)}%`} />
-                  <Bar dataKey="roi" fill="hsl(var(--chart-3))">
-                    {oddAnalysis.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.roi > 0 ? 'hsl(var(--success))' : 'hsl(var(--destructive))'} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-
+          {/* Gráficos */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card>
               <CardHeader>
-                <CardTitle>Evolução da Odd Média</CardTitle>
+                <CardTitle>Tendência de Performance (ROI Mensal)</CardTitle>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={300}>
-                  <LineChart data={oddSeries}>
+                  <LineChart data={lucroMensalData}>
                     <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                    <XAxis dataKey="date" stroke="hsl(var(--muted-foreground))" />
+                    <XAxis dataKey="mes" stroke="hsl(var(--muted-foreground))" />
                     <YAxis stroke="hsl(var(--muted-foreground))" />
-                    <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }} />
-                    <Line type="monotone" dataKey="odd" stroke="hsl(var(--chart-2))" strokeWidth={2} />
+                    <RechartsTooltip 
+                      contentStyle={{ backgroundColor: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))' }}
+                      formatter={(value: number) => formatPercentage(value)}
+                    />
+                    <Line type="monotone" dataKey="roi" stroke={CHART_COLORS[0]} strokeWidth={2} />
                   </LineChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -707,18 +829,19 @@ export default function Analises() {
 
             <Card>
               <CardHeader>
-                <CardTitle>Ganhas vs Perdidas por Faixa</CardTitle>
+                <CardTitle>Performance por Casa de Apostas</CardTitle>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={oddAnalysis}>
+                  <BarChart data={performancePorCasaData.slice(0, 5)} layout="vertical">
                     <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                    <XAxis dataKey="range" stroke="hsl(var(--muted-foreground))" />
-                    <YAxis stroke="hsl(var(--muted-foreground))" />
-                    <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }} />
-                    <Legend />
-                    <Bar dataKey="won" fill="hsl(var(--success))" name="Ganhas" stackId="a" />
-                    <Bar dataKey="lost" fill="hsl(var(--destructive))" name="Perdidas" stackId="a" />
+                    <XAxis type="number" stroke="hsl(var(--muted-foreground))" />
+                    <YAxis dataKey="casa" type="category" stroke="hsl(var(--muted-foreground))" width={100} />
+                    <RechartsTooltip 
+                      contentStyle={{ backgroundColor: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))' }}
+                      formatter={(value: number) => formatCurrency(value)}
+                    />
+                    <Bar dataKey="lucro" fill={CHART_COLORS[1]} />
                   </BarChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -726,39 +849,52 @@ export default function Analises() {
           </div>
         </TabsContent>
 
-        {/* ABA 5: PADRÕES TEMPORAIS */}
-        <TabsContent value="padroes" className="space-y-6">
+        {/* ABA 3: CASAS DE APOSTAS */}
+        <TabsContent value="casas" className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Heatmap: Dia × Período</CardTitle>
-              <CardDescription>Lucro médio por combinação dia/período</CardDescription>
+              <CardTitle>Tabela Comparativa de Casas</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="overflow-x-auto">
-                <table className="w-full border-collapse">
+                <table className="w-full">
                   <thead>
-                    <tr className="border-b border-border">
-                      <th className="p-2 text-left text-muted-foreground">Dia</th>
-                      <th className="p-2 text-center text-muted-foreground">Madrugada</th>
-                      <th className="p-2 text-center text-muted-foreground">Manhã</th>
-                      <th className="p-2 text-center text-muted-foreground">Tarde</th>
-                      <th className="p-2 text-center text-muted-foreground">Noite</th>
+                    <tr className="border-b">
+                      <th className="text-left p-2">Casa</th>
+                      <th className="text-right p-2">Apostas</th>
+                      <th className="text-right p-2">Taxa Acerto</th>
+                      <th className="text-right p-2">ROI</th>
+                      <th className="text-right p-2">Lucro</th>
+                      <th className="text-right p-2">Odd Média</th>
+                      <th className="text-center p-2">Avaliação</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {["Seg", "Ter", "Qua", "Qui", "Sex", "Sab", "Dom"].map(day => (
-                      <tr key={day} className="border-b border-border">
-                        <td className="p-2 font-semibold text-foreground">{day}</td>
-                        {["Madrugada", "Manhã", "Tarde", "Noite"].map(period => {
-                          const pattern = timePatterns.find(t => t.day === day && t.period === period);
-                          const lucro = pattern?.lucro || 0;
-                          const bgColor = lucro > 0 ? 'bg-success/20' : lucro < 0 ? 'bg-destructive/20' : 'bg-muted/20';
-                          return (
-                            <td key={period} className={`p-2 text-center ${bgColor}`}>
-                              {pattern ? formatCurrency(lucro) : '-'}
-                            </td>
-                          );
-                        })}
+                    {performancePorCasaData.map((casa, idx) => (
+                      <tr key={idx} className="border-b hover:bg-muted/50">
+                        <td className="p-2 font-medium">{casa.casa}</td>
+                        <td className="text-right p-2">{casa.apostas}</td>
+                        <td className="text-right p-2">{formatPercentage(casa.taxaAcerto)}</td>
+                        <td className={`text-right p-2 ${casa.roi > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          {formatPercentage(casa.roi)}
+                        </td>
+                        <td className={`text-right p-2 ${casa.lucro > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          {formatCurrency(casa.lucro)}
+                        </td>
+                        <td className="text-right p-2">{casa.oddMedia.toFixed(2)}</td>
+                        <td className="text-center p-2">
+                          <div className="flex justify-center gap-0.5">
+                            {Array.from({ length: 5 }).map((_, i) => {
+                              const stars = Math.round((casa.roi + 100) / 40);
+                              return (
+                                <Medal 
+                                  key={i} 
+                                  className={`w-4 h-4 ${i < Math.min(5, Math.max(1, stars)) ? 'text-yellow-500 fill-yellow-500' : 'text-gray-300'}`}
+                                />
+                              );
+                            })}
+                          </div>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -770,25 +906,22 @@ export default function Analises() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card>
               <CardHeader>
-                <CardTitle>Lucro por Dia da Semana</CardTitle>
+                <CardTitle>Performance por Casa</CardTitle>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={
-                    ["Seg", "Ter", "Qua", "Qui", "Sex", "Sab", "Dom"].map(day => ({
-                      day,
-                      lucro: sum(timePatterns.filter(t => t.day === day).map(t => t.lucro))
-                    }))
-                  }>
+                  <BarChart data={performancePorCasaData}>
                     <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                    <XAxis dataKey="day" stroke="hsl(var(--muted-foreground))" />
+                    <XAxis dataKey="casa" stroke="hsl(var(--muted-foreground))" angle={-45} textAnchor="end" height={100} />
                     <YAxis stroke="hsl(var(--muted-foreground))" />
-                    <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }} formatter={(value: number) => formatCurrency(value)} />
-                    <Bar dataKey="lucro" fill="hsl(var(--chart-4))">
-                      {["Seg", "Ter", "Qua", "Qui", "Sex", "Sab", "Dom"].map((day, index) => {
-                        const lucro = sum(timePatterns.filter(t => t.day === day).map(t => t.lucro));
-                        return <Cell key={`cell-${index}`} fill={lucro > 0 ? 'hsl(var(--success))' : 'hsl(var(--destructive))'} />;
-                      })}
+                    <RechartsTooltip 
+                      contentStyle={{ backgroundColor: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))' }}
+                      formatter={(value: number) => formatCurrency(value)}
+                    />
+                    <Bar dataKey="lucro" fill={CHART_COLORS[0]}>
+                      {performancePorCasaData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.lucro > 0 ? CHART_COLORS[0] : CHART_COLORS[3]} />
+                      ))}
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
@@ -797,81 +930,138 @@ export default function Analises() {
 
             <Card>
               <CardHeader>
-                <CardTitle>Apostas por Período do Dia</CardTitle>
+                <CardTitle>ROI por Casa</CardTitle>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={
-                    ["Madrugada", "Manhã", "Tarde", "Noite"].map(period => ({
-                      period,
-                      apostas: sum(timePatterns.filter(t => t.period === period).map(t => t.apostas))
-                    }))
-                  }>
+                  <BarChart data={performancePorCasaData} layout="vertical">
                     <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                    <XAxis dataKey="period" stroke="hsl(var(--muted-foreground))" />
-                    <YAxis stroke="hsl(var(--muted-foreground))" />
-                    <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }} />
-                    <Bar dataKey="apostas" fill="hsl(var(--chart-5))" />
+                    <XAxis type="number" stroke="hsl(var(--muted-foreground))" />
+                    <YAxis dataKey="casa" type="category" stroke="hsl(var(--muted-foreground))" width={100} />
+                    <RechartsTooltip 
+                      contentStyle={{ backgroundColor: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))' }}
+                      formatter={(value: number) => formatPercentage(value)}
+                    />
+                    <Bar dataKey="roi" fill={CHART_COLORS[1]} />
                   </BarChart>
                 </ResponsiveContainer>
               </CardContent>
             </Card>
           </div>
-        </TabsContent>
 
-        {/* ABA 6: PERFORMANCE TEMPORAL */}
-        <TabsContent value="temporal" className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Performance Mensal Combinada</CardTitle>
-              <CardDescription>Lucro, ROI e Volume ao longo do tempo</CardDescription>
+              <CardTitle>Volume vs Performance</CardTitle>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={400}>
-                <ComposedChart data={monthlyPerformance}>
+              <ResponsiveContainer width="100%" height={300}>
+                <ScatterChart>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis dataKey="month" stroke="hsl(var(--muted-foreground))" />
-                  <YAxis yAxisId="left" stroke="hsl(var(--muted-foreground))" />
-                  <YAxis yAxisId="right" orientation="right" stroke="hsl(var(--muted-foreground))" />
-                  <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }} />
-                  <Legend />
-                  <Bar yAxisId="left" dataKey="lucro" fill="hsl(var(--chart-1))" name="Lucro" />
-                  <Line yAxisId="right" type="monotone" dataKey="roi" stroke="hsl(var(--chart-2))" name="ROI (%)" strokeWidth={2} />
-                  <Area yAxisId="left" type="monotone" dataKey="apostas" fill="hsl(var(--chart-3))" stroke="hsl(var(--chart-3))" fillOpacity={0.3} name="Apostas" />
-                </ComposedChart>
+                  <XAxis 
+                    type="number" 
+                    dataKey="apostas" 
+                    name="Volume" 
+                    stroke="hsl(var(--muted-foreground))"
+                    label={{ value: 'Número de Apostas', position: 'bottom' }}
+                  />
+                  <YAxis 
+                    type="number" 
+                    dataKey="taxaAcerto" 
+                    name="Taxa" 
+                    stroke="hsl(var(--muted-foreground))"
+                    label={{ value: 'Taxa de Acerto (%)', angle: -90, position: 'left' }}
+                  />
+                  <RechartsTooltip 
+                    contentStyle={{ backgroundColor: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))' }}
+                    cursor={{ strokeDasharray: '3 3' }}
+                  />
+                  <Scatter name="Casas" data={performancePorCasaData} fill={CHART_COLORS[2]} />
+                </ScatterChart>
               </ResponsiveContainer>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* ABA 4: CATEGORIAS */}
+        <TabsContent value="categorias" className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Card>
+              <CardContent className="pt-6">
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground">Categoria Mais Lucrativa</p>
+                  <p className="text-xl font-bold">{categoriaData[0]?.categoria || '—'}</p>
+                  <p className="text-sm text-green-600">
+                    {categoriaData[0] ? formatCurrency(categoriaData[0].lucro) : '—'}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6">
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground">Melhor Taxa de Acerto</p>
+                  <p className="text-xl font-bold">
+                    {categoriaData.length > 0
+                      ? categoriaData.reduce((max, c) => c.taxaAcerto > max.taxaAcerto ? c : max).categoria
+                      : '—'}
+                  </p>
+                  <p className="text-sm text-green-600">
+                    {categoriaData.length > 0
+                      ? formatPercentage(categoriaData.reduce((max, c) => c.taxaAcerto > max.taxaAcerto ? c : max).taxaAcerto)
+                      : '—'}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6">
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground">Melhor ROI</p>
+                  <p className="text-xl font-bold">
+                    {categoriaData.length > 0
+                      ? categoriaData.reduce((max, c) => c.roi > max.roi ? c : max).categoria
+                      : '—'}
+                  </p>
+                  <p className="text-sm text-green-600">
+                    {categoriaData.length > 0
+                      ? formatPercentage(categoriaData.reduce((max, c) => c.roi > max.roi ? c : max).roi)
+                      : '—'}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
 
           <Card>
             <CardHeader>
-              <CardTitle>Tabela Mensal Detalhada</CardTitle>
+              <CardTitle>Tabela de Categorias</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="overflow-x-auto">
                 <table className="w-full">
-                  <thead className="border-b border-border">
-                    <tr>
-                      <th className="p-2 text-left text-muted-foreground">Mês</th>
-                      <th className="p-2 text-right text-muted-foreground">Apostas</th>
-                      <th className="p-2 text-right text-muted-foreground">Lucro</th>
-                      <th className="p-2 text-right text-muted-foreground">ROI</th>
-                      <th className="p-2 text-right text-muted-foreground">Variação</th>
+                  <thead>
+                    <tr className="border-b">
+                      <th className="text-left p-2">Categoria</th>
+                      <th className="text-right p-2">Apostas</th>
+                      <th className="text-right p-2">Taxa Acerto</th>
+                      <th className="text-right p-2">ROI</th>
+                      <th className="text-right p-2">Lucro</th>
+                      <th className="text-right p-2">Odd Média</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {monthlyPerformance.map((m, idx) => (
-                      <tr key={idx} className="border-b border-border hover:bg-muted/50">
-                        <td className="p-2 font-semibold text-foreground">{m.month}</td>
-                        <td className="p-2 text-right text-foreground">{m.apostas}</td>
-                        <td className={`p-2 text-right font-semibold ${m.lucro > 0 ? 'text-success' : 'text-destructive'}`}>
-                          {formatCurrency(m.lucro)}
+                    {categoriaData.map((cat, idx) => (
+                      <tr key={idx} className="border-b hover:bg-muted/50">
+                        <td className="p-2 font-medium">{cat.categoria}</td>
+                        <td className="text-right p-2">{cat.apostas}</td>
+                        <td className="text-right p-2">{formatPercentage(cat.taxaAcerto)}</td>
+                        <td className={`text-right p-2 ${cat.roi > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          {formatPercentage(cat.roi)}
                         </td>
-                        <td className="p-2 text-right text-foreground">{formatPercentage(m.roi)}</td>
-                        <td className={`p-2 text-right ${m.variacao > 0 ? 'text-success' : 'text-destructive'}`}>
-                          {m.variacao > 0 ? <ArrowUp className="inline w-4 h-4" /> : <ArrowDown className="inline w-4 h-4" />}
-                          {Math.abs(m.variacao).toFixed(1)}%
+                        <td className={`text-right p-2 ${cat.lucro > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          {formatCurrency(cat.lucro)}
                         </td>
+                        <td className="text-right p-2">{cat.oddMedia.toFixed(2)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -879,106 +1069,422 @@ export default function Analises() {
               </div>
             </CardContent>
           </Card>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Performance por Categoria</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={300}>
+                  <ComposedChart data={categoriaData.slice(0, 8)}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis dataKey="categoria" stroke="hsl(var(--muted-foreground))" angle={-45} textAnchor="end" height={100} />
+                    <YAxis yAxisId="left" stroke="hsl(var(--muted-foreground))" />
+                    <YAxis yAxisId="right" orientation="right" stroke="hsl(var(--muted-foreground))" />
+                    <RechartsTooltip 
+                      contentStyle={{ backgroundColor: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))' }}
+                    />
+                    <Legend />
+                    <Bar yAxisId="left" dataKey="lucro" fill={CHART_COLORS[0]} name="Lucro (R$)" />
+                    <Line yAxisId="right" type="monotone" dataKey="roi" stroke={CHART_COLORS[1]} name="ROI (%)" />
+                  </ComposedChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Distribuição de Apostas por Categoria</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={300}>
+                  <PieChart>
+                    <Pie
+                      data={categoriaData.slice(0, 8)}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      label={({ categoria, percent }) => `${categoria} ${(percent * 100).toFixed(0)}%`}
+                      outerRadius={80}
+                      fill="#8884d8"
+                      dataKey="apostas"
+                    >
+                      {categoriaData.slice(0, 8).map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <RechartsTooltip 
+                      contentStyle={{ backgroundColor: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))' }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
 
-        {/* ABA 7: GESTÃO DE RISCO */}
-        <TabsContent value="risco" className="space-y-6">
+        {/* ABA 5: ANÁLISE DE ODDS */}
+        <TabsContent value="odds" className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <KPICard
+              title="Value Bets"
+              value={formatPercentage(oddsMetrics.valueBets)}
+              icon={Target}
+              description="Apostas com ROI > 10%"
+            />
+            <KPICard
+              title="Acerto Odds Baixas"
+              value={formatPercentage(oddsMetrics.acertoOddsBaixas)}
+              icon={TrendingDown}
+              description="Odds entre 1.0 e 1.5"
+            />
+            <KPICard
+              title="Acerto Odds Altas"
+              value={formatPercentage(oddsMetrics.acertoOddsAltas)}
+              icon={TrendingUp}
+              description="Odds acima de 3.0"
+            />
+            <KPICard
+              title="Odd Média Vencedora"
+              value={oddsMetrics.oddMediaVencedora.toFixed(2)}
+              icon={Trophy}
+              description="Média das odds ganhas"
+            />
+          </div>
+
           <Card>
             <CardHeader>
-              <CardTitle>Métricas de Risco</CardTitle>
+              <CardTitle>Sweet Spot de Odds</CardTitle>
+              <CardDescription>
+                Faixa de odds com melhor desempenho
+              </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="p-4 rounded-lg bg-muted/50 text-center">
-                  <p className="text-sm text-muted-foreground mb-1">Sharpe Ratio</p>
-                  <p className="text-2xl font-bold text-foreground">{riskMetrics.sharpeRatio.toFixed(2)}</p>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground">Faixa Ideal</p>
+                  <p className="text-3xl font-bold text-green-600">{oddsMetrics.sweetSpot.faixa}</p>
                 </div>
-                <div className="p-4 rounded-lg bg-destructive/10 text-center">
-                  <p className="text-sm text-muted-foreground mb-1">Max Drawdown</p>
-                  <p className="text-2xl font-bold text-destructive">{formatCurrency(riskMetrics.maxDrawdown)}</p>
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground">ROI</p>
+                  <p className="text-3xl font-bold">{formatPercentage(oddsMetrics.sweetSpot.roi)}</p>
                 </div>
-                <div className="p-4 rounded-lg bg-muted/50 text-center">
-                  <p className="text-sm text-muted-foreground mb-1">Volatilidade</p>
-                  <p className="text-2xl font-bold text-foreground">{formatCurrency(riskMetrics.volatility)}</p>
-                </div>
-                <div className="p-4 rounded-lg bg-success/10 text-center">
-                  <p className="text-sm text-muted-foreground mb-1">Profit Factor</p>
-                  <p className="text-2xl font-bold text-success">{riskMetrics.profitFactor.toFixed(2)}</p>
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground">Taxa de Acerto</p>
+                  <p className="text-3xl font-bold">{formatPercentage(oddsMetrics.sweetSpot.taxa)}</p>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Risk-Return por Casa</CardTitle>
-              <CardDescription>Dispersão: Volatilidade × ROI</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={350}>
-                <ScatterChart>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis dataKey="volatility" name="Volatilidade" stroke="hsl(var(--muted-foreground))" type="number" />
-                  <YAxis dataKey="roi" name="ROI" stroke="hsl(var(--muted-foreground))" />
-                  <Tooltip 
-                    cursor={{ strokeDasharray: '3 3' }}
-                    contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }}
-                    formatter={(value: number) => value.toFixed(2)}
-                  />
-                  <Scatter 
-                    data={performanceByHouse.map(h => ({ volatility: h.volatility || 0, roi: h.roi, casa: h.casa }))} 
-                    fill="hsl(var(--chart-1))" 
-                  />
-                </ScatterChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Relação Odd vs Performance</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={300}>
+                  <ComposedChart data={oddsRangeData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis dataKey="faixa" stroke="hsl(var(--muted-foreground))" />
+                    <YAxis yAxisId="left" stroke="hsl(var(--muted-foreground))" />
+                    <YAxis yAxisId="right" orientation="right" stroke="hsl(var(--muted-foreground))" />
+                    <RechartsTooltip 
+                      contentStyle={{ backgroundColor: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))' }}
+                    />
+                    <Legend />
+                    <Bar yAxisId="left" dataKey="taxaAcerto" fill={CHART_COLORS[0]} name="Taxa Acerto (%)" />
+                    <Line yAxisId="right" type="monotone" dataKey="roi" stroke={CHART_COLORS[1]} name="ROI (%)" />
+                  </ComposedChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Eficiência por Faixa</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {oddsRangeData.map((faixa, idx) => (
+                  <div key={idx} className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm font-medium">{faixa.faixa}</span>
+                      <span className="text-sm font-bold">{formatPercentage(faixa.taxaAcerto)}</span>
+                    </div>
+                    <Progress value={faixa.taxaAcerto} className="h-2" />
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>{faixa.count} apostas</span>
+                      <span>ROI: {formatPercentage(faixa.roi)}</span>
+                    </div>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          </div>
 
           <Card>
             <CardHeader>
-              <CardTitle>Evolução do Drawdown</CardTitle>
+              <CardTitle>Timing Insight</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Alert>
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>{oddsMetrics.timingInsight}</AlertDescription>
+              </Alert>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ABA 6: ANÁLISE DE RISCO */}
+        <TabsContent value="risco" className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <KPICard
+              title="Max Drawdown"
+              value={formatPercentage(riskMetrics.maxDrawdown)}
+              icon={TrendingDown}
+              description="Maior queda"
+              variant="destructive"
+            />
+            <KPICard
+              title="Volatilidade"
+              value={formatPercentage(riskMetrics.volatilidade)}
+              icon={Activity}
+              description="Desvio padrão"
+            />
+            <KPICard
+              title="Score de Risco"
+              value={riskMetrics.scoreRisco.toFixed(0)}
+              icon={Shield}
+              description="0-100 (menor é melhor)"
+            />
+            <KPICard
+              title="Kelly %"
+              value={formatPercentage(riskMetrics.kellyPercentual)}
+              icon={Percent}
+              description="% recomendado da banca"
+            />
+          </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Gráfico de Drawdown</CardTitle>
+              <CardDescription>Evolução das quedas ao longo do tempo</CardDescription>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
-                <AreaChart data={series}>
+                <AreaChart data={riskMetrics.drawdownSeries}>
                   <defs>
-                    <linearGradient id="colorDD" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="hsl(var(--destructive))" stopOpacity={0.8}/>
-                      <stop offset="95%" stopColor="hsl(var(--destructive))" stopOpacity={0}/>
+                    <linearGradient id="colorDrawdown" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor={CHART_COLORS[3]} stopOpacity={0.8}/>
+                      <stop offset="95%" stopColor={CHART_COLORS[3]} stopOpacity={0}/>
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                   <XAxis dataKey="date" stroke="hsl(var(--muted-foreground))" />
                   <YAxis stroke="hsl(var(--muted-foreground))" />
-                  <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }} formatter={(value: number) => formatCurrency(value)} />
-                  <Area type="monotone" dataKey="lucro" stroke="hsl(var(--destructive))" fillOpacity={1} fill="url(#colorDD)" />
-                  <ReferenceLine y={0} stroke="hsl(var(--muted-foreground))" strokeDasharray="3 3" />
+                  <RechartsTooltip 
+                    contentStyle={{ backgroundColor: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))' }}
+                    formatter={(value: number) => formatPercentage(value)}
+                  />
+                  <Area 
+                    type="monotone" 
+                    dataKey="drawdown" 
+                    stroke={CHART_COLORS[3]} 
+                    fillOpacity={1} 
+                    fill="url(#colorDrawdown)" 
+                  />
                 </AreaChart>
               </ResponsiveContainer>
             </CardContent>
           </Card>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <Card>
+              <CardContent className="pt-6">
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground flex items-center gap-1">
+                    Value at Risk (95%)
+                    <InfoTooltip 
+                      title="VaR 95%"
+                      description="Em 95% dos casos, suas perdas não excedem esse valor"
+                    />
+                  </p>
+                  <p className="text-2xl font-bold">{formatPercentage(riskMetrics.valueAtRisk)}</p>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6">
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground flex items-center gap-1">
+                    Expected Shortfall
+                    <InfoTooltip 
+                      title="Expected Shortfall"
+                      description="Perda média quando excede o VaR"
+                    />
+                  </p>
+                  <p className="text-2xl font-bold">{formatPercentage(riskMetrics.expectedShortfall)}</p>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6">
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground">Recovery Time</p>
+                  <p className="text-2xl font-bold">{riskMetrics.recoveryTime} dias</p>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6">
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground">Risk-Adjusted Return</p>
+                  <p className="text-2xl font-bold">{formatPercentage(riskMetrics.riskAdjustedReturn)}</p>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
 
-        {/* ABA 8: TIPOS DE APOSTA */}
-        <TabsContent value="tipos" className="space-y-6">
+        {/* ABA 7: ANÁLISE TEMPORAL */}
+        <TabsContent value="temporal" className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <Card>
+              <CardContent className="pt-6">
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground">Melhor Dia da Semana</p>
+                  <p className="text-xl font-bold">{temporalMetrics.melhorDia.dia}</p>
+                  <p className="text-sm text-green-600">{formatCurrency(temporalMetrics.melhorDia.lucro)}</p>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6">
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground">Melhor Horário</p>
+                  <p className="text-xl font-bold">
+                    {temporalMetrics.melhorHorario ? `${temporalMetrics.melhorHorario.hora}h` : '—'}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {temporalMetrics.melhorHorario ? formatCurrency(temporalMetrics.melhorHorario.lucro) : 'Sem dados'}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6">
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground">Melhor Mês do Ano</p>
+                  <p className="text-xl font-bold">{temporalMetrics.melhorMes.mes}</p>
+                  <p className="text-sm text-green-600">{formatPercentage(temporalMetrics.melhorMes.roi)}</p>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6">
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground">Dias Consecutivos</p>
+                  <p className="text-xl font-bold">{temporalMetrics.diasConsecutivos}</p>
+                  <p className="text-sm text-muted-foreground">De atividade</p>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Performance por Dia da Semana</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={300}>
+                  <ComposedChart data={performanceDiaSemanaData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis dataKey="dia" stroke="hsl(var(--muted-foreground))" />
+                    <YAxis yAxisId="left" stroke="hsl(var(--muted-foreground))" />
+                    <YAxis yAxisId="right" orientation="right" stroke="hsl(var(--muted-foreground))" />
+                    <RechartsTooltip 
+                      contentStyle={{ backgroundColor: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))' }}
+                    />
+                    <Legend />
+                    <Bar yAxisId="left" dataKey="lucro" fill={CHART_COLORS[0]} name="Lucro (R$)" />
+                    <Line yAxisId="right" type="monotone" dataKey="apostas" stroke={CHART_COLORS[1]} name="Apostas" />
+                  </ComposedChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Evolução Mensal</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={300}>
+                  <LineChart data={lucroMensalData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis dataKey="mes" stroke="hsl(var(--muted-foreground))" />
+                    <YAxis stroke="hsl(var(--muted-foreground))" />
+                    <RechartsTooltip 
+                      contentStyle={{ backgroundColor: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))' }}
+                    />
+                    <Legend />
+                    <Line type="monotone" dataKey="lucro" stroke={CHART_COLORS[0]} name="Lucro (R$)" strokeWidth={2} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Heatmap Mensal */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Heatmap de Performance Mensal</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <div className="grid grid-cols-13 gap-2 min-w-max">
+                  <div className="font-semibold text-sm p-2">Ano</div>
+                  {['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'].map(mes => (
+                    <div key={mes} className="font-semibold text-sm p-2 text-center">{mes}</div>
+                  ))}
+                  
+                  {Array.from(new Set(temporalMetrics.heatmapMensal.map(h => h.ano))).map(ano => (
+                    <>
+                      <div key={ano} className="font-semibold text-sm p-2">{ano}</div>
+                      {Array.from({ length: 12 }, (_, i) => {
+                        const data = temporalMetrics.heatmapMensal.find(h => h.ano === ano && h.mes === i);
+                        const roi = data?.roi || 0;
+                        const bgColor = roi > 5 ? 'bg-green-500/20' : roi > 0 ? 'bg-yellow-500/20' : roi < 0 ? 'bg-red-500/20' : 'bg-muted';
+                        
+                        return (
+                          <div 
+                            key={i} 
+                            className={`p-2 rounded text-center text-sm ${bgColor} cursor-pointer hover:opacity-80 transition-opacity`}
+                            title={data ? `${formatPercentage(roi)} - ${formatCurrency(data.lucro)}` : 'Sem dados'}
+                          >
+                            {data ? formatPercentage(roi) : '—'}
+                          </div>
+                        );
+                      })}
+                    </>
+                  ))}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ABA 8: PADRÕES & TENDÊNCIAS */}
+        <TabsContent value="padroes" className="space-y-6">
           <Alert>
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>
-              Esta aba será implementada com análise detalhada por tipo de aposta (simples, múltipla, sistema, etc.)
-            </AlertDescription>
-          </Alert>
-        </TabsContent>
-
-        {/* ABA 9: INSIGHTS AVANÇADOS */}
-        <TabsContent value="insights" className="space-y-6">
-          <Alert>
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>
-              Esta aba conterá análises avançadas: correlações, sequências, previsões e clustering de apostas similares.
+              Esta aba está em desenvolvimento e incluirá análises de consistência, momentum, ciclos e padrões de bônus.
             </AlertDescription>
           </Alert>
         </TabsContent>
       </Tabs>
-    </div>
+    </motion.div>
   );
 }
