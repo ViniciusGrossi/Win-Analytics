@@ -129,8 +129,10 @@ export function CreateApostaDialog({ open, onOpenChange, onSuccess }: CreateApos
   const bonus = form.watch("bonus") || 0;
   const turbo = selectedTurbo;
 
-  const retornoBase = valorApostado * odd;
-  const turboValue = retornoBase * turbo;
+  // Cálculo correto: turbo é aplicado sobre o LUCRO, não sobre o retorno total
+  const retornoBase = valorApostado * odd; // Valor total que retorna (investimento + lucro)
+  const lucroBase = retornoBase - valorApostado; // Apenas o lucro
+  const turboValue = lucroBase * turbo; // Turbo aplicado sobre o lucro
   const retornoPotencial = retornoBase + (hasBonus ? bonus : 0) + turboValue;
   const lucroPotencial = retornoPotencial - valorApostado;
 
