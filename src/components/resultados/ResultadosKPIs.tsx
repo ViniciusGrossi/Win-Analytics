@@ -11,30 +11,26 @@ interface ResultadosKPIsProps {
 
 export function ResultadosKPIs({ apostas, isLoading }: ResultadosKPIsProps) {
   const metrics = useMemo(() => {
-    const pendentes = apostas.filter((a) => a.resultado === "Pendente");
-    
-    const totalApostadoPendente = pendentes.reduce(
-      (sum, a) => sum + (a.valor_apostado || 0),
-      0
+    const pendentes = apostas.filter((a) => 
+      a.resultado && ["Ganhou", "Perdeu", "Cashout"].includes(a.resultado)
     );
+    const ganhas = pendentes.filter((a) => a.resultado === "Ganhou");
+    const perdidas = pendentes.filter((a) => a.resultado === "Perdeu");
 
-    const retornoPotencial = pendentes.reduce((sum, a) => {
-      const retorno = (a.valor_apostado || 0) * (a.odd || 1) + (a.bonus || 0) + (a.turbo || 0);
-      return sum + retorno;
-    }, 0);
+    const taxaAcerto = pendentes.length > 0
+      ? (ganhas.length / pendentes.length) * 100
+      : 0;
 
-    const lucroPotencial = retornoPotencial - totalApostadoPendente;
-
-    const roiPotencial = totalApostadoPendente > 0
-      ? ((lucroPotencial / totalApostadoPendente) * 100)
+    const oddMedia = apostas.length > 0
+      ? apostas.reduce((sum, a) => sum + (a.odd || 0), 0) / apostas.length
       : 0;
 
     return {
-      apostasPendentes: pendentes.length,
-      totalApostadoPendente,
-      retornoPotencial,
-      lucroPotencial,
-      roiPotencial,
+      totalApostas: apostas.length,
+      ganhas: ganhas.length,
+      perdidas: perdidas.length,
+      taxaAcerto,
+      oddMedia,
     };
   }, [apostas]);
 
