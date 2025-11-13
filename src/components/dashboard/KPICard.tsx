@@ -11,9 +11,11 @@ interface KPICardProps {
   isLoading?: boolean;
   delay?: number;
   subtitle?: string;
+  description?: string;
+  variant?: string;
 }
 
-export function KPICard({ title, value, icon: Icon, trend, isLoading, delay = 0, subtitle }: KPICardProps) {
+export function KPICard({ title, value, icon: Icon, trend, isLoading, delay = 0, subtitle, description, variant }: KPICardProps) {
   if (isLoading) {
     return (
       <Card>
@@ -62,6 +64,9 @@ export function KPICard({ title, value, icon: Icon, trend, isLoading, delay = 0,
             )}
             {subtitle && (
               <p className="text-xs text-muted-foreground">{subtitle}</p>
+            )}
+            {description && (
+              <p className="text-xs text-muted-foreground mt-1">{description}</p>
             )}
           </div>
         </CardContent>
