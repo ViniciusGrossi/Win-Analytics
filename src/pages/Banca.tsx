@@ -5,6 +5,7 @@ import { BookieCard } from "@/components/banca/BookieCard";
 import { KPICard } from "@/components/dashboard/KPICard";
 import { TransactionsHistory } from "@/components/banca/TransactionsHistory";
 import { GoalsManager } from "@/components/banca/GoalsManager";
+import { BettingUnits } from "@/components/banca/BettingUnits";
 import { formatCurrency } from "@/lib/utils";
 import { Wallet, TrendingUp, Calendar } from "lucide-react";
 import type { Bookie } from "@/types/betting";
@@ -77,6 +78,8 @@ export default function Banca() {
             delay={0.2}
           />
         </div>
+
+        <BettingUnits totalBalance={totalBalance} />
 
         <GoalsManager />
 
