@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,12 +7,38 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Calculator, TrendingUp, AlertCircle } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { Slider } from "@/components/ui/slider";
+import { bookiesService } from "@/services/bookies";
 
 export function KellyCalculator() {
   const [isOpen, setIsOpen] = useState(false);
-  const [bankroll, setBankroll] = useState<number>(1000);
+  const [bankroll, setBankroll] = useState<number>(0);
   const [odd, setOdd] = useState<number>(2.0);
-  const [probability, setProbability] = useState<number>(55);
+  const [probability, setProbability] = useState<number>(50);
+  
+  // Carregar banca real
+  useEffect(() => {
+    const loadBankroll = async () => {
+      try {
+        const bookies = await bookiesService.list();
+        const totalBalance = bookies.reduce((sum, bookie) => sum + (bookie.balance || 0), 0);
+        setBankroll(totalBalance);
+      } catch (error) {
+        console.error("Erro ao carregar banca:", error);
+      }
+    };
+    
+    if (isOpen) {
+      loadBankroll();
+    }
+  }, [isOpen]);
+  
+  // Calcular probabilidade implícita da odd
+  useEffect(() => {
+    if (odd >= 1.01) {
+      const impliedProbability = (1 / odd) * 100;
+      setProbability(Math.round(impliedProbability));
+    }
+  }, [odd]);
   
   // Critério de Kelly: f = (p*b - (1-p)) / b
   // onde p = probabilidade de vitória, b = odd - 1
@@ -112,7 +138,12 @@ export function KellyCalculator() {
             </div>
             
             <div className="space-y-2">
-              <Label htmlFor="probability">Probabilidade (%)</Label>
+              <Label htmlFor="probability">
+                Probabilidade (%)
+                <span className="text-xs text-muted-foreground ml-2">
+                  Sugerido: {((1 / odd) * 100).toFixed(1)}%
+                </span>
+              </Label>
               <Input
                 id="probability"
                 type="number"
