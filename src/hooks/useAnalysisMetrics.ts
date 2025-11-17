@@ -611,3 +611,145 @@ export function useTemporalMetrics(apostas: Aposta[]): TemporalMetrics {
     };
   }, [apostas]);
 }
+
+export function usePatternsMetrics(apostas: Aposta[]) {
+  return useMemo(() => {
+    const apostasResolvidas = apostas.filter(a => 
+      a.resultado && ['Ganhou', 'Perdeu', 'Cancelado', 'Cashout'].includes(a.resultado)
+    );
+
+    // Consistência: variação das taxas de acerto mensais
+    const porMes = apostasResolvidas.reduce((acc, a) => {
+      const mesKey = dayjs(a.data).format('YYYY-MM');
+      if (!acc[mesKey]) acc[mesKey] = { ganhou: 0, total: 0 };
+      acc[mesKey].total++;
+      if (a.resultado === 'Ganhou') acc[mesKey].ganhou++;
+      return acc;
+    }, {} as Record<string, { ganhou: number; total: number }>);
+
+    const taxasMensais = Object.values(porMes).map(m => (m.ganhou / m.total) * 100);
+    const consistencia = taxasMensais.length > 0
+      ? 100 - (taxasMensais.reduce((sum, t, _, arr) => {
+          const media = arr.reduce((s, v) => s + v, 0) / arr.length;
+          return sum + Math.pow(t - media, 2);
+        }, 0) / taxasMensais.length)
+      : 0;
+
+    // Momentum: comparar últimas 10 apostas vs anteriores
+    const ultimas10 = apostasResolvidas.slice(-10);
+    const anteriores = apostasResolvidas.slice(-20, -10);
+    
+    const taxaUltimas = ultimas10.length > 0
+      ? (ultimas10.filter(a => a.resultado === 'Ganhou').length / ultimas10.length) * 100
+      : 0;
+    
+    const taxaAnteriores = anteriores.length > 0
+      ? (anteriores.filter(a => a.resultado === 'Ganhou').length / anteriores.length) * 100
+      : 0;
+
+    const diferencaMomentum = taxaUltimas - taxaAnteriores;
+    const momentum = diferencaMomentum > 10 ? 'Quente' : diferencaMomentum < -10 ? 'Frio' : 'Morno';
+
+    // Ciclo dominante: intervalo médio entre apostas
+    const datasOrdenadas = [...new Set(apostas.map(a => a.data).filter(Boolean))].sort();
+    let somaIntervalos = 0;
+    let countIntervalos = 0;
+
+    for (let i = 1; i < datasOrdenadas.length; i++) {
+      const diff = dayjs(datasOrdenadas[i]).diff(dayjs(datasOrdenadas[i - 1]), 'days');
+      somaIntervalos += diff;
+      countIntervalos++;
+    }
+
+    const intervaloMedio = countIntervalos > 0 ? somaIntervalos / countIntervalos : 0;
+    let cicloDominante = 'Diário';
+    if (intervaloMedio < 1.5) cicloDominante = 'Diário';
+    else if (intervaloMedio >= 1.5 && intervaloMedio < 3.5) cicloDominante = `${intervaloMedio.toFixed(1)} dias`;
+    else if (intervaloMedio >= 3.5 && intervaloMedio < 8) cicloDominante = 'Semanal';
+    else if (intervaloMedio >= 8 && intervaloMedio < 15) cicloDominante = 'Quinzenal';
+    else cicloDominante = 'Mensal';
+
+    // Direção da tendência
+    let direcaoTendencia = 'Neutra';
+    if (apostasResolvidas.length >= 20) {
+      const ultimas = apostasResolvidas.slice(-10);
+      const anterioresT = apostasResolvidas.slice(-20, -10);
+      
+      const roiUltimas = ultimas.reduce((sum, a) => {
+        const inv = a.valor_apostado || 0;
+        return sum + (inv > 0 ? ((a.valor_final || 0) / inv) * 100 : 0);
+      }, 0) / ultimas.length;
+      
+      const roiAnteriores = anterioresT.reduce((sum, a) => {
+        const inv = a.valor_apostado || 0;
+        return sum + (inv > 0 ? ((a.valor_final || 0) / inv) * 100 : 0);
+      }, 0) / anterioresT.length;
+
+      if (roiUltimas > roiAnteriores + 5) direcaoTendencia = 'Ascendente ↗';
+      else if (roiUltimas < roiAnteriores - 5) direcaoTendencia = 'Descendente ↘';
+      else direcaoTendencia = 'Lateral →';
+    }
+
+    // Análise por categoria (top categorias com mais de 10 apostas)
+    const porCategoria = apostas.reduce((acc, a) => {
+      const cats = (a.categoria || '').split(/[,;]/).map(c => c.trim()).filter(Boolean);
+      cats.forEach(cat => {
+        if (!acc[cat]) acc[cat] = { total: 0, ganhou: 0, investido: 0, lucro: 0 };
+        acc[cat].total++;
+        acc[cat].investido += a.valor_apostado || 0;
+        acc[cat].lucro += a.valor_final || 0;
+        if (a.resultado === 'Ganhou') acc[cat].ganhou++;
+      });
+      return acc;
+    }, {} as Record<string, { total: number; ganhou: number; investido: number; lucro: number }>);
+
+    const categorias = Object.entries(porCategoria)
+      .filter(([, data]) => data.total >= 10)
+      .map(([cat, data]) => ({
+        categoria: cat,
+        total: data.total,
+        taxaAcerto: (data.ganhou / data.total) * 100,
+        roi: data.investido > 0 ? (data.lucro / data.investido) * 100 : 0,
+        lucro: data.lucro,
+      }))
+      .sort((a, b) => b.lucro - a.lucro);
+
+    // Análise de bônus
+    const apostasBonus = apostas.filter(a => a.bonus || a.turbo);
+    const apostasResolvidasBonus = apostasBonus.filter(a => 
+      a.resultado && ['Ganhou', 'Perdeu', 'Cancelado', 'Cashout'].includes(a.resultado)
+    );
+    
+    const bonusMetrics = {
+      total: apostasBonus.length,
+      taxaAcerto: apostasResolvidasBonus.length > 0
+        ? (apostasResolvidasBonus.filter(a => a.resultado === 'Ganhou').length / apostasResolvidasBonus.length) * 100
+        : 0,
+      roi: apostasResolvidasBonus.reduce((sum, a) => {
+        const inv = a.valor_apostado || 0;
+        return sum + (inv > 0 ? ((a.valor_final || 0) / inv) * 100 : 0);
+      }, 0) / Math.max(1, apostasResolvidasBonus.length),
+      lucro: apostasResolvidasBonus.reduce((sum, a) => sum + (a.valor_final || 0), 0),
+    };
+
+    // Série temporal para consistência
+    const consistenciaSeries = Object.entries(porMes).map(([mes, data]) => ({
+      mes,
+      taxaAcerto: (data.ganhou / data.total) * 100,
+    }));
+
+    return {
+      consistencia: Math.max(0, Math.min(100, consistencia)),
+      momentum,
+      momentumDiff: diferencaMomentum,
+      cicloDominante,
+      intervaloMedio,
+      direcaoTendencia,
+      categorias,
+      bonusMetrics,
+      consistenciaSeries,
+      taxasMensais,
+    };
+  }, [apostas]);
+}
+
