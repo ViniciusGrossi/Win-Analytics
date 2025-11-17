@@ -18,7 +18,8 @@ import {
   usePerformanceMetrics, 
   useRiskMetrics,
   useOddsMetrics,
-  useTemporalMetrics 
+  useTemporalMetrics,
+  usePatternsMetrics
 } from "@/hooks/useAnalysisMetrics";
 import { InfoTooltip } from "@/components/analysis/InfoTooltip";
 import {
@@ -112,6 +113,7 @@ export default function Analises() {
   const riskMetrics = useRiskMetrics(apostas);
   const oddsMetrics = useOddsMetrics(apostas);
   const temporalMetrics = useTemporalMetrics(apostas);
+  const patternsMetrics = usePatternsMetrics(apostas);
 
   // Extrair valores únicos para filtros
   const casasDisponiveis = Array.from(
@@ -1914,12 +1916,266 @@ export default function Analises() {
 
         {/* ABA 8: PADRÕES & TENDÊNCIAS */}
         <TabsContent value="padroes" className="space-y-6">
-          <Alert>
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>
-              Esta aba está em desenvolvimento e incluirá análises de consistência, momentum, ciclos e padrões de bônus.
-            </AlertDescription>
-          </Alert>
+          {/* Indicadores de Padrões */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <Card className="bg-gradient-to-br from-blue-500/5 to-background">
+              <CardContent className="pt-6">
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground flex items-center gap-1">
+                    Consistência
+                    <InfoTooltip 
+                      title="Consistência"
+                      description="Baseada na variação da taxa de acerto mensal. Quanto maior, mais estável"
+                    />
+                  </p>
+                  <p className="text-2xl font-bold text-blue-600">
+                    {patternsMetrics.consistencia.toFixed(1)}/100
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className={`bg-gradient-to-br ${
+              patternsMetrics.momentum === 'Quente' ? 'from-green-500/5' :
+              patternsMetrics.momentum === 'Frio' ? 'from-red-500/5' :
+              'from-yellow-500/5'
+            } to-background`}>
+              <CardContent className="pt-6">
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground flex items-center gap-1">
+                    Momentum
+                    <InfoTooltip 
+                      title="Momentum"
+                      description="Compara performance das últimas 10 apostas vs anteriores"
+                    />
+                  </p>
+                  <p className={`text-2xl font-bold ${
+                    patternsMetrics.momentum === 'Quente' ? 'text-green-600' :
+                    patternsMetrics.momentum === 'Frio' ? 'text-red-600' :
+                    'text-yellow-600'
+                  }`}>
+                    {patternsMetrics.momentum}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {patternsMetrics.momentumDiff > 0 ? '+' : ''}{patternsMetrics.momentumDiff.toFixed(1)} p.p.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-gradient-to-br from-purple-500/5 to-background">
+              <CardContent className="pt-6">
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground flex items-center gap-1">
+                    Ciclo Dominante
+                    <InfoTooltip 
+                      title="Ciclo Dominante"
+                      description="Intervalo médio entre apostas"
+                    />
+                  </p>
+                  <p className="text-2xl font-bold text-purple-600">
+                    {patternsMetrics.cicloDominante}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Média: {patternsMetrics.intervaloMedio.toFixed(1)} dias
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-gradient-to-br from-orange-500/5 to-background">
+              <CardContent className="pt-6">
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground flex items-center gap-1">
+                    Direção da Tendência
+                    <InfoTooltip 
+                      title="Tendência"
+                      description="Direção geral da performance recente"
+                    />
+                  </p>
+                  <p className="text-2xl font-bold text-orange-600">
+                    {patternsMetrics.direcaoTendencia}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Gráfico de Consistência */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Consistência ao Longo do Tempo</CardTitle>
+              <CardDescription>Taxa de acerto por mês</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={300}>
+                <AreaChart data={patternsMetrics.consistenciaSeries}>
+                  <defs>
+                    <linearGradient id="colorConsistencia" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor={CHART_COLORS[0]} stopOpacity={0.8}/>
+                      <stop offset="95%" stopColor={CHART_COLORS[0]} stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis dataKey="mes" stroke="hsl(var(--muted-foreground))" />
+                  <YAxis stroke="hsl(var(--muted-foreground))" />
+                  <RechartsTooltip 
+                    contentStyle={{ backgroundColor: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))' }}
+                    formatter={(value: number) => `${value.toFixed(1)}%`}
+                  />
+                  <Area 
+                    type="monotone" 
+                    dataKey="taxaAcerto" 
+                    stroke={CHART_COLORS[0]} 
+                    fillOpacity={1} 
+                    fill="url(#colorConsistencia)"
+                    name="Taxa de Acerto"
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+
+          {/* Análise por Categoria */}
+          {patternsMetrics.categorias.length > 0 && (
+            <>
+              <Card>
+                <CardHeader>
+                  <CardTitle>Análise por Categoria</CardTitle>
+                  <CardDescription>Categorias com mais de 10 apostas</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b">
+                          <th className="text-left py-2 px-4">Categoria</th>
+                          <th className="text-right py-2 px-4">Apostas</th>
+                          <th className="text-right py-2 px-4">Taxa de Acerto</th>
+                          <th className="text-right py-2 px-4">ROI</th>
+                          <th className="text-right py-2 px-4">Lucro</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {patternsMetrics.categorias.map((cat) => (
+                          <tr key={cat.categoria} className="border-b hover:bg-muted/50">
+                            <td className="py-2 px-4 font-medium">{cat.categoria}</td>
+                            <td className="py-2 px-4 text-right">{cat.total}</td>
+                            <td className="py-2 px-4 text-right">
+                              <span className={cat.taxaAcerto >= 60 ? 'text-green-600' : cat.taxaAcerto >= 50 ? 'text-yellow-600' : 'text-red-600'}>
+                                {cat.taxaAcerto.toFixed(1)}%
+                              </span>
+                            </td>
+                            <td className="py-2 px-4 text-right">
+                              <span className={cat.roi >= 0 ? 'text-green-600' : 'text-red-600'}>
+                                {cat.roi > 0 ? '+' : ''}{cat.roi.toFixed(2)}%
+                              </span>
+                            </td>
+                            <td className="py-2 px-4 text-right">
+                              <span className={cat.lucro >= 0 ? 'text-green-600 font-semibold' : 'text-red-600 font-semibold'}>
+                                {formatCurrency(cat.lucro)}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Gráficos de Categoria */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Distribuição por Categoria</CardTitle>
+                    <CardDescription>Volume de apostas</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <ResponsiveContainer width="100%" height={300}>
+                      <PieChart>
+                        <Pie
+                          data={patternsMetrics.categorias.slice(0, 8)}
+                          cx="50%"
+                          cy="50%"
+                          labelLine={false}
+                          label={(entry) => `${entry.categoria}: ${entry.total}`}
+                          outerRadius={80}
+                          fill={CHART_COLORS[0]}
+                          dataKey="total"
+                        >
+                          {patternsMetrics.categorias.slice(0, 8).map((_, index) => (
+                            <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                          ))}
+                        </Pie>
+                        <RechartsTooltip 
+                          contentStyle={{ backgroundColor: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))' }}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Performance por Categoria</CardTitle>
+                    <CardDescription>ROI e Taxa de Acerto</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <ResponsiveContainer width="100%" height={300}>
+                      <BarChart data={patternsMetrics.categorias.slice(0, 6)}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                        <XAxis dataKey="categoria" stroke="hsl(var(--muted-foreground))" />
+                        <YAxis stroke="hsl(var(--muted-foreground))" />
+                        <RechartsTooltip 
+                          contentStyle={{ backgroundColor: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))' }}
+                        />
+                        <Legend />
+                        <Bar dataKey="taxaAcerto" fill={CHART_COLORS[1]} name="Taxa Acerto (%)" />
+                        <Bar dataKey="roi" fill={CHART_COLORS[2]} name="ROI (%)" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </CardContent>
+                </Card>
+              </div>
+            </>
+          )}
+
+          {/* Análise de Bônus */}
+          {patternsMetrics.bonusMetrics.total > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Análise de Apostas com Bônus</CardTitle>
+                <CardDescription>Performance com bônus/turbo</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div className="space-y-2">
+                    <p className="text-sm text-muted-foreground">Total de Apostas</p>
+                    <p className="text-2xl font-bold">{patternsMetrics.bonusMetrics.total}</p>
+                  </div>
+                  <div className="space-y-2">
+                    <p className="text-sm text-muted-foreground">Taxa de Acerto</p>
+                    <p className={`text-2xl font-bold ${patternsMetrics.bonusMetrics.taxaAcerto >= 50 ? 'text-green-600' : 'text-red-600'}`}>
+                      {patternsMetrics.bonusMetrics.taxaAcerto.toFixed(1)}%
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <p className="text-sm text-muted-foreground">ROI</p>
+                    <p className={`text-2xl font-bold ${patternsMetrics.bonusMetrics.roi >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      {patternsMetrics.bonusMetrics.roi > 0 ? '+' : ''}{patternsMetrics.bonusMetrics.roi.toFixed(2)}%
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <p className="text-sm text-muted-foreground">Lucro Total</p>
+                    <p className={`text-2xl font-bold ${patternsMetrics.bonusMetrics.lucro >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      {formatCurrency(patternsMetrics.bonusMetrics.lucro)}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
       </Tabs>
     </motion.div>
