@@ -1,6 +1,8 @@
-import { Home, ClipboardList, CheckCircle2, BarChart3, Wallet, Bot, User, LogOut } from "lucide-react";
+import { Home, ClipboardList, CheckCircle2, BarChart3, Wallet, Bot, User, LogOut, Download } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { Button } from "@/components/ui/button";
+import { usePWA } from "@/hooks/usePWA";
+import { toast } from "sonner";
 import {
   Sidebar,
   SidebarContent,
@@ -22,6 +24,13 @@ const menuItems = [
 ];
 
 export function AppSidebar() {
+  const { isInstallable, installPWA } = usePWA();
+
+  const handleInstallClick = async () => {
+    await installPWA();
+    toast.success("App instalado com sucesso!");
+  };
+
   return (
     <Sidebar className="border-r">
       <SidebarContent>
@@ -52,6 +61,17 @@ export function AppSidebar() {
       </SidebarContent>
       
       <div className="mt-auto border-t border-border p-4 space-y-2">
+        {isInstallable && (
+          <Button 
+            onClick={handleInstallClick}
+            variant="default" 
+            className="w-full justify-start gap-3" 
+            size="sm"
+          >
+            <Download className="h-4 w-4" />
+            <span className="text-sm">Instalar App</span>
+          </Button>
+        )}
         <Button variant="ghost" className="w-full justify-start gap-3" size="sm">
           <User className="h-4 w-4" />
           <span className="text-sm">Usuário</span>
