@@ -753,3 +753,115 @@ export function usePatternsMetrics(apostas: Aposta[]) {
   }, [apostas]);
 }
 
+export function useExposureMetrics(apostas: Aposta[]) {
+  return useMemo(() => {
+    const resolvidas = apostas.filter(a => a.resultado && ['Ganhou', 'Perdeu', 'Cancelado', 'Cashout'].includes(a.resultado));
+    const totalStake = resolvidas.reduce((s, a) => s + (a.valor_apostado || 0), 0);
+    const porCasa = resolvidas.reduce((acc, a) => {
+      const key = a.casa_de_apostas || '—';
+      acc[key] = (acc[key] || 0) + (a.valor_apostado || 0);
+      return acc;
+    }, {} as Record<string, number>);
+    const participacaoCasa = Object.entries(porCasa).map(([casa, stake]) => ({ casa, stake, share: totalStake > 0 ? stake / totalStake : 0 }));
+    const hhiCasa = participacaoCasa.reduce((s, p) => s + Math.pow(p.share, 2), 0) * 100;
+    const porCategoria = resolvidas.reduce((acc, a) => {
+      const cats = (a.categoria || '').split(/[,;]/).map(c => c.trim()).filter(Boolean);
+      const stake = a.valor_apostado || 0;
+      if (cats.length === 0) {
+        acc['—'] = (acc['—'] || 0) + stake;
+      } else {
+        cats.forEach(cat => {
+          acc[cat] = (acc[cat] || 0) + stake;
+        });
+      }
+      return acc;
+    }, {} as Record<string, number>);
+    const participacaoCategoria = Object.entries(porCategoria).map(([categoria, stake]) => ({ categoria, stake, share: totalStake > 0 ? stake / totalStake : 0 }));
+    const hhiCategoria = participacaoCategoria.reduce((s, p) => s + Math.pow(p.share, 2), 0) * 100;
+    const retornosPct = resolvidas.map(a => {
+      const inv = a.valor_apostado || 0;
+      return inv > 0 ? ((a.valor_final || 0) / inv) * 100 : 0;
+    });
+    const stakes = resolvidas.map(a => a.valor_apostado || 0);
+    const meanStake = stakes.reduce((s, v) => s + v, 0) / Math.max(1, stakes.length);
+    const meanRet = retornosPct.reduce((s, v) => s + v, 0) / Math.max(1, retornosPct.length);
+    const cov = stakes.reduce((s, v, i) => s + (v - meanStake) * (retornosPct[i] - meanRet), 0) / Math.max(1, stakes.length);
+    const varStake = stakes.reduce((s, v) => s + Math.pow(v - meanStake, 2), 0) / Math.max(1, stakes.length);
+    const varRet = retornosPct.reduce((s, v) => s + Math.pow(v - meanRet, 2), 0) / Math.max(1, retornosPct.length);
+    const stakeReturnCorrelation = varStake > 0 && varRet > 0 ? cov / Math.sqrt(varStake * varRet) : 0;
+    return { hhiCasa, hhiCategoria, participacaoCasa, participacaoCategoria, stakeReturnCorrelation };
+  }, [apostas]);
+}
+
+export function useEVMetrics(apostas: Aposta[]) {
+  return useMemo(() => {
+    const resolvidas = apostas.filter(a => a.resultado && ['Ganhou', 'Perdeu', 'Cancelado', 'Cashout'].includes(a.resultado));
+    const bins = resolvidas.reduce((acc, a) => {
+      const odd = a.odd || 0;
+      const faixaBase = Math.floor(odd / 0.25) * 0.25;
+      const faixaStr = `${faixaBase.toFixed(2)}-${(faixaBase + 0.25).toFixed(2)}`;
+      const win = a.resultado === 'Ganhou' ? 1 : 0;
+      if (!acc[faixaStr]) acc[faixaStr] = { wins: 0, total: 0, oddSum: 0 };
+      acc[faixaStr].wins += win;
+      acc[faixaStr].total += 1;
+      acc[faixaStr].oddSum += odd;
+      return acc;
+    }, {} as Record<string, { wins: number; total: number; oddSum: number }>);
+    const evByOddBin = Object.entries(bins)
+      .filter(([, d]) => d.total >= 5)
+      .map(([faixa, d]) => {
+        const p = d.wins / d.total;
+        const oddMedia = d.oddSum / d.total;
+        const ev = p * (oddMedia - 1) - (1 - p);
+        return { faixa, p, ev, count: d.total };
+      })
+      .sort((a, b) => parseFloat(a.faixa) - parseFloat(b.faixa));
+    const brierScore = evByOddBin.length > 0 ? (() => {
+      const mapBinToP: Record<string, number> = {};
+      evByOddBin.forEach(b => { mapBinToP[b.faixa] = b.p; });
+      const sum = resolvidas.reduce((s, a) => {
+        const odd = a.odd || 0;
+        const faixaBase = Math.floor(odd / 0.25) * 0.25;
+        const faixaStr = `${faixaBase.toFixed(2)}-${(faixaBase + 0.25).toFixed(2)}`;
+        const p = mapBinToP[faixaStr] ?? 0;
+        const y = a.resultado === 'Ganhou' ? 1 : 0;
+        return s + Math.pow(y - p, 2);
+      }, 0);
+      return sum / Math.max(1, resolvidas.length);
+    })() : 0;
+    return { evByOddBin, brierScore };
+  }, [apostas]);
+}
+
+export function useAdvancedRiskMetrics(apostas: Aposta[]) {
+  return useMemo(() => {
+    const resolvidas = apostas.filter(a => a.resultado && ['Ganhou', 'Perdeu', 'Cancelado', 'Cashout'].includes(a.resultado));
+    const ordenadas = [...resolvidas].sort((a, b) => dayjs(a.data).diff(dayjs(b.data)));
+    let peak = 0;
+    let acumulado = 0;
+    const drawdownsPct: number[] = [];
+    ordenadas.forEach(a => {
+      acumulado += a.valor_final || 0;
+      if (acumulado > peak) peak = acumulado;
+      const dd = peak > 0 ? ((peak - acumulado) / peak) * 100 : 0;
+      drawdownsPct.push(dd);
+    });
+    const ulcerIndex = drawdownsPct.length > 0 ? Math.sqrt(drawdownsPct.reduce((s, v) => s + Math.pow(v, 2), 0) / drawdownsPct.length) : 0;
+    const totalInvestido = resolvidas.reduce((s, a) => s + (a.valor_apostado || 0), 0);
+    const lucroTotal = resolvidas.reduce((s, a) => s + (a.valor_final || 0), 0);
+    const retornoPct = totalInvestido > 0 ? (lucroTotal / totalInvestido) * 100 : 0;
+    const maxDrawdown = drawdownsPct.length > 0 ? Math.max(...drawdownsPct) : 0;
+    const marRatio = maxDrawdown > 0 ? retornoPct / maxDrawdown : 0;
+    const retornosPct = resolvidas.map(a => {
+      const inv = a.valor_apostado || 0;
+      return inv > 0 ? ((a.valor_final || 0) / inv) * 100 : 0;
+    });
+    const media = retornosPct.length > 0 ? retornosPct.reduce((s, v) => s + v, 0) / retornosPct.length : 0;
+    const varr = retornosPct.length > 0 ? retornosPct.reduce((s, v) => s + Math.pow(v - media, 2), 0) / retornosPct.length : 0;
+    const std = Math.sqrt(varr);
+    const skewness = std > 0 && retornosPct.length > 0 ? (retornosPct.reduce((s, v) => s + Math.pow(v - media, 3), 0) / retornosPct.length) / Math.pow(std, 3) : 0;
+    const kurtosis = std > 0 && retornosPct.length > 0 ? (retornosPct.reduce((s, v) => s + Math.pow(v - media, 4), 0) / retornosPct.length) / Math.pow(std, 4) : 0;
+    return { ulcerIndex, marRatio, skewness, kurtosis };
+  }, [apostas]);
+}
+

@@ -19,7 +19,10 @@ import {
   useRiskMetrics,
   useOddsMetrics,
   useTemporalMetrics,
-  usePatternsMetrics
+  usePatternsMetrics,
+  useExposureMetrics,
+  useEVMetrics,
+  useAdvancedRiskMetrics
 } from "@/hooks/useAnalysisMetrics";
 import { InfoTooltip } from "@/components/analysis/InfoTooltip";
 import {
@@ -114,6 +117,9 @@ export default function Analises() {
   const oddsMetrics = useOddsMetrics(apostas);
   const temporalMetrics = useTemporalMetrics(apostas);
   const patternsMetrics = usePatternsMetrics(apostas);
+  const exposureMetrics = useExposureMetrics(apostas);
+  const evMetrics = useEVMetrics(apostas);
+  const advancedRisk = useAdvancedRiskMetrics(apostas);
 
   // Extrair valores únicos para filtros
   const casasDisponiveis = Array.from(
@@ -983,6 +989,12 @@ export default function Analises() {
               icon={Calendar}
               description="Média mensal"
             />
+            <KPICard
+              title="Correlação Stake vs Retorno"
+              value={exposureMetrics.stakeReturnCorrelation.toFixed(2)}
+              icon={TrendingUpDown}
+              description="Relação entre valor apostado e retorno em %"
+            />
           </div>
 
           {/* Análise Temporal */}
@@ -1471,7 +1483,7 @@ export default function Analises() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Sweet Spot de Odds</CardTitle>
+              <CardTitle className="flex items-center gap-2">Sweet Spot de Odds<InfoTooltip title="Sweet Spot" description="Faixa de odds com melhor combinação de ROI e taxa de acerto" /></CardTitle>
               <CardDescription>
                 Faixa de odds com melhor desempenho
               </CardDescription>
@@ -1497,7 +1509,7 @@ export default function Analises() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card>
               <CardHeader>
-                <CardTitle>Relação Odd vs Performance</CardTitle>
+                <CardTitle className="flex items-center gap-2">Relação Odd vs Performance<InfoTooltip title="Odd vs Performance" description="Taxa de acerto e ROI por faixa de odd" /></CardTitle>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={300}>
@@ -1579,6 +1591,18 @@ export default function Analises() {
               value={formatPercentage(riskMetrics.kellyPercentual)}
               icon={Percent}
               description="% recomendado da banca"
+            />
+            <KPICard
+              title="Ulcer Index"
+              value={formatPercentage(advancedRisk.ulcerIndex)}
+              icon={TrendingDown}
+              description="Intensidade de drawdown ao longo do tempo"
+            />
+            <KPICard
+              title="MAR Ratio"
+              value={advancedRisk.marRatio.toFixed(2)}
+              icon={TrendingUp}
+              description="Retorno vs maior drawdown"
             />
           </div>
 
@@ -1711,7 +1735,7 @@ export default function Analises() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card>
               <CardHeader>
-                <CardTitle>Performance por Dia da Semana</CardTitle>
+                <CardTitle className="flex items-center gap-2">Performance por Dia da Semana<InfoTooltip title="Dia da Semana" description="Lucro e volume de apostas por dia" /></CardTitle>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={300}>
@@ -1755,7 +1779,7 @@ export default function Analises() {
           {/* Heatmap Mensal */}
           <Card>
             <CardHeader>
-              <CardTitle>Heatmap de Performance Mensal</CardTitle>
+              <CardTitle className="flex items-center gap-2">Heatmap de Performance Mensal<InfoTooltip title="Heatmap" description="ROI e lucro por mês ao longo dos anos" /></CardTitle>
               <CardDescription>Visualize sua performance mês a mês ao longo do tempo</CardDescription>
             </CardHeader>
             <CardContent>
@@ -2181,5 +2205,32 @@ export default function Analises() {
     </motion.div>
   );
 }
+
+        
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">EV por Faixa de Odd<InfoTooltip title="Valor Esperado" description="Estimativa de valor esperado por faixa de odd, usando taxa de acerto histórica" /></CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={evMetrics.evByOddBin}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis dataKey="faixa" stroke="hsl(var(--muted-foreground))" />
+                    <YAxis stroke="hsl(var(--muted-foreground))" />
+                    <RechartsTooltip contentStyle={{ backgroundColor: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))' }} />
+                    <Bar dataKey="ev" fill={CHART_COLORS[1]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">Brier Score<InfoTooltip title="Brier Score" description="Qualidade das probabilidades estimadas em relação aos resultados" /></CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{evMetrics.brierScore.toFixed(3)}</div>
+              </CardContent>
+            </Card>
 
         
