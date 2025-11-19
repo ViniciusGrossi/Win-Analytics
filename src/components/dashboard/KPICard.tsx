@@ -37,19 +37,19 @@ export function KPICard({ title, value, icon: Icon, trend, isLoading, delay = 0,
     >
       <Card className="relative overflow-hidden border-border/50 hover:border-primary/50 transition-all duration-300 hover:shadow-lg hover:shadow-primary/10">
         <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-transparent" />
-        <CardContent className="p-6 relative">
-          <div className="flex items-center justify-between mb-4">
+        <CardContent className="p-4 sm:p-6 relative">
+          <div className="flex items-center justify-between mb-3 sm:mb-4">
             <p className="text-sm text-muted-foreground font-medium">{title}</p>
             <motion.div
               whileHover={{ rotate: 360, scale: 1.1 }}
               transition={{ duration: 0.3 }}
             >
-              <Icon className="h-5 w-5 text-primary" />
+              <Icon className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
             </motion.div>
           </div>
           <div className="space-y-1">
             <motion.h3
-              className="text-3xl font-bold tracking-tight"
+              className="text-2xl sm:text-3xl font-bold tracking-tight"
               initial={{ scale: 0.5, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               transition={{ delay: delay + 0.1, type: "spring" }}

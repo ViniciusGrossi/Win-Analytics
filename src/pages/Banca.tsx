@@ -79,14 +79,14 @@ export default function Banca() {
   , bookies[0] || { last_update: new Date().toISOString() });
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 px-2 sm:px-4">
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="flex items-center justify-between"
+        className="flex items-center justify-between flex-col sm:flex-row gap-3"
       >
         <div>
-          <h1 className="text-4xl font-bold tracking-tight">Banca</h1>
+          <h1 className="text-2xl sm:text-4xl font-bold tracking-tight">Banca</h1>
           <p className="text-muted-foreground mt-1">Gerencie suas casas de apostas</p>
         </div>
         <div className="flex gap-2">
@@ -98,7 +98,7 @@ export default function Banca() {
       </motion.div>
 
       <div className="space-y-6">
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-3 sm:gap-4 grid-cols-1 md:grid-cols-3">
           <KPICard
             title="Saldo Total"
             value={formatCurrency(totalBalance)}
@@ -127,13 +127,13 @@ export default function Banca() {
         <GoalsManager />
 
         {isLoading ? (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-3 sm:gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
             {[...Array(6)].map((_, i) => (
               <div key={i} className="h-40 bg-muted/50 animate-pulse rounded-xl" />
             ))}
           </div>
         ) : bookies.length > 0 ? (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-3 sm:gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
             {bookies.map((bookie) => (
               <BookieCard key={bookie.id} bookie={bookie} onUpdate={loadBookies} />
             ))}
@@ -147,7 +147,7 @@ export default function Banca() {
         <TransactionsHistory />
       </div>
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="w-[95vw] sm:max-w-md p-3 sm:p-6">
           <DialogHeader>
             <DialogTitle>Nova Casa de Apostas</DialogTitle>
           </DialogHeader>

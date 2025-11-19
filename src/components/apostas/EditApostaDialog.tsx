@@ -216,7 +216,7 @@ export function EditApostaDialog({ open, onOpenChange, aposta, onSuccess }: Edit
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="w-[95vw] sm:max-w-2xl max-h-[90vh] overflow-y-auto p-3 sm:p-6">
         <DialogHeader>
           <DialogTitle className="text-2xl">Editar Aposta</DialogTitle>
           <DialogDescription>Altere os dados da aposta ou exclua-a</DialogDescription>

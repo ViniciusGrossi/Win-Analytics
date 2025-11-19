@@ -56,24 +56,24 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 px-2 sm:px-4">
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="flex items-center justify-between"
+        className="flex items-center justify-between flex-col sm:flex-row gap-3"
       >
         <div>
-          <h1 className="text-4xl font-bold tracking-tight">Dashboard</h1>
+          <h1 className="text-2xl sm:text-4xl font-bold tracking-tight">Dashboard</h1>
           <p className="text-muted-foreground mt-1">Visão geral do seu desempenho</p>
         </div>
       </motion.div>
 
       <div className="space-y-4">
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           <div className="flex items-center gap-2">
             <Popover>
               <PopoverTrigger asChild>
-                <Button variant="outline" className={cn("w-[240px] justify-start", !startDate && "text-muted-foreground")}
+                <Button variant="outline" className={cn("w-full sm:w-[240px] justify-start", !startDate && "text-muted-foreground")}
                 >
                   {startDate ? format(new Date(startDate), "PPP", { locale: ptBR }) : "Data inicial"}
                   <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
@@ -91,7 +91,7 @@ export default function Dashboard() {
             </Popover>
             <Popover>
               <PopoverTrigger asChild>
-                <Button variant="outline" className={cn("w-[240px] justify-start", !endDate && "text-muted-foreground")}
+                <Button variant="outline" className={cn("w-full sm:w-[240px] justify-start", !endDate && "text-muted-foreground")}
                 >
                   {endDate ? format(new Date(endDate), "PPP", { locale: ptBR }) : "Data final"}
                   <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
@@ -117,7 +117,7 @@ export default function Dashboard() {
           </TabsList>
 
         <TabsContent value="geral" className="space-y-6">
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-3 sm:gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
             <KPICard
               title="Total Apostado"
               value={kpis ? formatCurrency(kpis.totalApostado) : "-"}
@@ -162,7 +162,7 @@ export default function Dashboard() {
             />
           </div>
 
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-3 sm:gap-4 grid-cols-1 md:grid-cols-2">
             <LucroChart data={series} isLoading={isLoading} />
             <DistributionChart data={distribution} isLoading={isLoading} />
           </div>

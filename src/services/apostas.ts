@@ -51,8 +51,7 @@ export const apostasService = {
   },
 
   async create(dto: ApostaFormData, bookieBalance: number) {
-    // Validar saldo se não for bônus
-    if (!dto.bonus && bookieBalance < dto.valor_apostado) {
+    if (bookieBalance < dto.valor_apostado) {
       throw new Error("Saldo insuficiente na casa de apostas");
     }
 
@@ -69,18 +68,15 @@ export const apostasService = {
 
     if (apostaError) throw apostaError;
 
-    // Debitar saldo se não for bônus
-    if (!dto.bonus) {
-      const { error: balanceError } = await supabase
-        .from("bookies")
-        .update({ 
-          balance: bookieBalance - dto.valor_apostado,
-          last_update: new Date().toISOString()
-        })
-        .eq("name", dto.casa_de_apostas);
+    const { error: balanceError } = await supabase
+      .from("bookies")
+      .update({ 
+        balance: bookieBalance - dto.valor_apostado,
+        last_update: new Date().toISOString()
+      })
+      .eq("name", dto.casa_de_apostas);
 
-      if (balanceError) throw balanceError;
-    }
+    if (balanceError) throw balanceError;
 
     return aposta as Aposta;
   },
@@ -95,15 +91,20 @@ export const apostasService = {
     let updateBalance = 0;
 
     if (resultado === "Ganhou") {
-      const lucro = (apostaData.valor_apostado || 0) * ((apostaData.odd || 1) - 1);
-      valor_final = lucro;
-      updateBalance = apostaData.bonus ? lucro : (apostaData.valor_apostado || 0) + lucro;
+      const lucroBase = (apostaData.valor_apostado || 0) * ((apostaData.odd || 1) - 1);
+      const lucroBonus = (apostaData.bonus || 0) * ((apostaData.odd || 1) - 1);
+      const turbo = apostaData.turbo || 0;
+      const isPercentTurbo = turbo > 0 && turbo <= 1;
+      const turboProfit = isPercentTurbo ? (lucroBase + lucroBonus) * turbo : turbo;
+      const lucroTotal = (lucroBase + lucroBonus) + turboProfit;
+      valor_final = lucroTotal;
+      updateBalance = (apostaData.valor_apostado || 0) + lucroTotal;
     } else if (resultado === "Perdeu") {
-      valor_final = apostaData.bonus ? 0 : -(apostaData.valor_apostado || 0);
+      valor_final = -(apostaData.valor_apostado || 0);
       updateBalance = 0;
     } else if (resultado === "Cancelado") {
       valor_final = 0;
-      updateBalance = apostaData.bonus ? 0 : (apostaData.valor_apostado || 0);
+      updateBalance = (apostaData.valor_apostado || 0);
     } else if (resultado === "Cashout" && cashoutValue) {
       valor_final = cashoutValue - (apostaData.valor_apostado || 0);
       updateBalance = cashoutValue;

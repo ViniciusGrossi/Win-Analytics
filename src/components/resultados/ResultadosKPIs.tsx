@@ -21,10 +21,13 @@ export function ResultadosKPIs({ apostas, isLoading }: ResultadosKPIsProps) {
 
     // Cálculo correto do retorno potencial
     const retornoPotencial = pendentes.reduce((sum, a) => {
-      const retornoBase = (a.valor_apostado || 0) * (a.odd || 1);
-      const bonus = a.bonus || 0;
-      const turbo = a.turbo || 0; // Turbo já vem calculado corretamente do banco
-      return sum + retornoBase + bonus + turbo;
+      const lucroBase = (a.valor_apostado || 0) * Math.max((a.odd || 0) - 1, 0);
+      const lucroBonus = (a.bonus || 0) * Math.max((a.odd || 0) - 1, 0);
+      const turbo = a.turbo || 0;
+      const isPercentTurbo = turbo > 0 && turbo <= 1;
+      const turboProfit = isPercentTurbo ? (lucroBase + lucroBonus) * turbo : turbo;
+      const lucroPotencial = (lucroBase + lucroBonus) + turboProfit;
+      return sum + (a.valor_apostado || 0) + lucroPotencial;
     }, 0);
 
     const lucroPotencial = retornoPotencial - totalApostadoPendente;
@@ -64,7 +67,7 @@ export function ResultadosKPIs({ apostas, isLoading }: ResultadosKPIsProps) {
         icon={Target}
         isLoading={isLoading}
         delay={0.2}
-        description="Inclui bônus e turbo"
+        description="Inclui lucro do bônus e turbo"
       />
       <KPICard
         title="Lucro Potencial"

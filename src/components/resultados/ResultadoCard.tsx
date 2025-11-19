@@ -48,10 +48,13 @@ export function ResultadoCard({ aposta, onSetResult }: ResultadoCardProps) {
     }
   };
 
-  const retornoBase = (aposta.valor_apostado || 0) * (aposta.odd || 1);
-  const bonusValue = aposta.bonus || 0;
-  const potentialReturn = retornoBase + bonusValue + (aposta.turbo || 0);
-  const potentialProfit = potentialReturn - (aposta.valor_apostado || 0);
+  const lucroBase = (aposta.valor_apostado || 0) * Math.max((aposta.odd || 0) - 1, 0);
+  const lucroBonus = (aposta.bonus || 0) * Math.max((aposta.odd || 0) - 1, 0);
+  const turbo = aposta.turbo || 0;
+  const isPercentTurbo = turbo > 0 && turbo <= 1;
+  const turboProfit = isPercentTurbo ? (lucroBase + lucroBonus) * turbo : turbo;
+  const potentialProfit = (lucroBase + lucroBonus) + turboProfit;
+  const potentialReturn = (aposta.valor_apostado || 0) + potentialProfit;
 
   return (
     <>

@@ -1804,8 +1804,8 @@ export default function Analises() {
                     );
                   }
 
-                  return (
-                    <div className="space-y-6">
+  return (
+    <div className="space-y-6 px-2 sm:px-4">
                       {anos.map(ano => (
                         <div key={ano} className="space-y-3">
                           <h4 className="font-semibold text-lg flex items-center gap-2">

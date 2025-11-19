@@ -17,13 +17,14 @@ const COLORS = {
 
 export function DistributionChart({ data, isLoading }: DistributionChartProps) {
   if (isLoading) {
-    return <Skeleton className="h-[300px] w-full" />;
+    return <Skeleton className="h-[240px] sm:h-[300px] w-full" />;
   }
 
   return (
     <Card className="p-6 glass-effect">
-      <h3 className="text-lg font-semibold mb-4">Distribuição por Status</h3>
-      <ResponsiveContainer width="100%" height={300}>
+      <h3 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4">Distribuição por Status</h3>
+      <div className="h-[240px] sm:h-[300px]">
+      <ResponsiveContainer width="100%" height="100%">
         <PieChart>
           <Pie
             data={data}
@@ -52,6 +53,7 @@ export function DistributionChart({ data, isLoading }: DistributionChartProps) {
           <Legend />
         </PieChart>
       </ResponsiveContainer>
+      </div>
     </Card>
   );
 }

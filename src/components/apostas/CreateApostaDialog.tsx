@@ -130,11 +130,12 @@ export function CreateApostaDialog({ open, onOpenChange, onSuccess }: CreateApos
   const turbo = selectedTurbo;
 
   // Cálculo correto: turbo é aplicado sobre o LUCRO, não sobre o retorno total
-  const retornoBase = valorApostado * odd; // Valor total que retorna (investimento + lucro)
-  const lucroBase = retornoBase - valorApostado; // Apenas o lucro
-  const turboValue = lucroBase * turbo; // Turbo aplicado sobre o lucro
-  const retornoPotencial = retornoBase + (hasBonus ? bonus : 0) + turboValue;
-  const lucroPotencial = retornoPotencial - valorApostado;
+  const lucroBase = valorApostado * Math.max((odd || 0) - 1, 0);
+  const lucroBonus = (hasBonus ? bonus : 0) * Math.max((odd || 0) - 1, 0);
+  const retornoBase = valorApostado + lucroBase;
+  const turboProfit = (lucroBase + lucroBonus) * turbo;
+  const lucroPotencial = (lucroBase + lucroBonus) * (1 + turbo);
+  const retornoPotencial = valorApostado + lucroPotencial;
 
   useEffect(() => {
     if (open) {
@@ -143,8 +144,8 @@ export function CreateApostaDialog({ open, onOpenChange, onSuccess }: CreateApos
   }, [open]);
 
   useEffect(() => {
-    form.setValue("turbo", turboValue);
-  }, [turboValue]);
+    form.setValue("turbo", turbo);
+  }, [turbo]);
 
   const loadBookies = async () => {
     try {
@@ -161,7 +162,7 @@ export function CreateApostaDialog({ open, onOpenChange, onSuccess }: CreateApos
       return;
     }
 
-    if (!hasBonus && data.valor_apostado > (selectedBookie.balance || 0)) {
+    if (data.valor_apostado > (selectedBookie.balance || 0)) {
       toast({ 
         title: "Saldo Insuficiente", 
         description: `Você possui apenas ${formatCurrency(selectedBookie.balance || 0)} na ${selectedBookie.name}`,
@@ -179,7 +180,7 @@ export function CreateApostaDialog({ open, onOpenChange, onSuccess }: CreateApos
         valor_apostado: data.valor_apostado,
         odd: data.odd,
         bonus: hasBonus ? data.bonus : 0,
-        turbo: turboValue,
+        turbo: turbo,
         detalhes: data.detalhes,
         partida: data.partida,
         torneio: data.torneio,
@@ -210,7 +211,7 @@ export function CreateApostaDialog({ open, onOpenChange, onSuccess }: CreateApos
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="w-[95vw] sm:max-w-2xl max-h-[90vh] overflow-y-auto p-3 sm:p-6">
         <DialogHeader>
           <DialogTitle className="text-2xl">Nova Aposta</DialogTitle>
           <DialogDescription>
@@ -243,14 +244,14 @@ export function CreateApostaDialog({ open, onOpenChange, onSuccess }: CreateApos
                     </div>
                     {hasBonus && bonus > 0 && (
                       <div className="flex justify-between text-green-600">
-                        <span>+ Bônus:</span>
-                        <span className="font-semibold">{formatCurrency(bonus)}</span>
+                        <span>+ Lucro do bônus:</span>
+                        <span className="font-semibold">{formatCurrency(lucroBonus)}</span>
                       </div>
                     )}
-                    {turboValue > 0 && (
+                    {turboProfit > 0 && (
                       <div className="flex justify-between text-blue-600">
                         <span>+ Turbo ({(turbo * 100).toFixed(0)}%):</span>
-                        <span className="font-semibold">{formatCurrency(turboValue)}</span>
+                        <span className="font-semibold">{formatCurrency(turboProfit)}</span>
                       </div>
                     )}
                     <div className="pt-2 border-t flex justify-between">
