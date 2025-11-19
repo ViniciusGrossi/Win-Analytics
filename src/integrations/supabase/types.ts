@@ -45,7 +45,7 @@ export type Database = {
           tipo_aposta?: string | null
           torneio?: string | null
           turbo?: number | null
-          user_id: string
+          user_id?: string
           valor_apostado?: number | null
           valor_final?: number | null
         }
@@ -95,7 +95,7 @@ export type Database = {
           last_update?: string | null
           last_withdraw?: string | null
           name: string
-          user_id: string
+          user_id?: string
         }
         Update: {
           balance?: number | null
@@ -169,7 +169,7 @@ export type Database = {
           monthly_goal?: number | null
           result?: boolean | null
           updated_at?: string | null
-          user_id: string
+          user_id?: string
         }
         Update: {
           created_at?: string | null
@@ -229,7 +229,7 @@ export type Database = {
           description?: string | null
           id?: number
           type: string
-          user_id: string
+          user_id?: string
         }
         Update: {
           amount?: number
