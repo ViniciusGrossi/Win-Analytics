@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Search } from "lucide-react";
+import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Search, Zap, Gift } from "lucide-react";
 import type { Aposta } from "@/types/betting";
 import { motion } from "framer-motion";
 import { Edit } from "lucide-react";
@@ -43,8 +43,23 @@ export function ApostasTable({ data, isLoading, onReload }: ApostasTableProps) {
         accessorKey: "partida",
         header: "Partida",
         cell: ({ row }) => (
-          <div className="max-w-[200px] truncate" title={row.original.partida || ""}>
-            {row.original.partida}
+          <div className="max-w-[200px]">
+            <div className="truncate font-medium" title={row.original.partida || ""}>
+              {row.original.partida}
+            </div>
+            <div className="flex items-center gap-1 mt-1">
+              {(row.original.turbo || 0) > 0 && (
+                <div className="flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-600 dark:text-blue-400 text-[10px]">
+                  <Zap className="h-2.5 w-2.5" />
+                  <span>+{((row.original.turbo || 0) * 100).toFixed(0)}%</span>
+                </div>
+              )}
+              {(row.original.bonus || 0) > 0 && (
+                <div className="flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-green-500/10 text-green-600 dark:text-green-400 text-[10px]">
+                  <Gift className="h-2.5 w-2.5" />
+                </div>
+              )}
+            </div>
           </div>
         ),
       },

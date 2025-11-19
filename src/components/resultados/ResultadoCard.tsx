@@ -3,7 +3,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import { Trophy, X, Ban, DollarSign } from "lucide-react";
+import { Trophy, X, Ban, DollarSign, Zap, Gift } from "lucide-react";
 import type { Aposta } from "@/types/betting";
 import { motion } from "framer-motion";
 import {
@@ -51,9 +51,8 @@ export function ResultadoCard({ aposta, onSetResult }: ResultadoCardProps) {
   const lucroBase = (aposta.valor_apostado || 0) * Math.max((aposta.odd || 0) - 1, 0);
   const lucroBonus = (aposta.bonus || 0) * Math.max((aposta.odd || 0) - 1, 0);
   const turbo = aposta.turbo || 0;
-  const isPercentTurbo = turbo > 0 && turbo <= 1;
-  const turboProfit = isPercentTurbo ? (lucroBase + lucroBonus) * turbo : turbo;
-  const potentialProfit = (lucroBase + lucroBonus) + turboProfit;
+  const lucroSemTurbo = lucroBase + lucroBonus;
+  const potentialProfit = turbo > 0 ? lucroSemTurbo * (1 + turbo) : lucroSemTurbo;
   const potentialReturn = (aposta.valor_apostado || 0) + potentialProfit;
 
   return (
@@ -66,8 +65,22 @@ export function ResultadoCard({ aposta, onSetResult }: ResultadoCardProps) {
         <Card className="p-4 glass-effect">
           <div className="space-y-3">
             <div className="flex items-start justify-between">
-              <div className="space-y-1">
-                <h4 className="font-semibold">{aposta.partida}</h4>
+              <div className="space-y-1 flex-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h4 className="font-semibold">{aposta.partida}</h4>
+                  {(aposta.turbo || 0) > 0 && (
+                    <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 text-xs">
+                      <Zap className="h-3 w-3" />
+                      <span>+{((aposta.turbo || 0) * 100).toFixed(0)}%</span>
+                    </div>
+                  )}
+                  {(aposta.bonus || 0) > 0 && (
+                    <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-green-500/10 text-green-600 dark:text-green-400 text-xs">
+                      <Gift className="h-3 w-3" />
+                      <span>{formatCurrency(aposta.bonus || 0)}</span>
+                    </div>
+                  )}
+                </div>
                 <p className="text-sm text-muted-foreground">{aposta.detalhes}</p>
               </div>
               <StatusBadge status={(aposta.resultado || "Pendente") as any} />
