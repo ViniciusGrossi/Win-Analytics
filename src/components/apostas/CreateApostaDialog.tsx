@@ -338,40 +338,38 @@ export function CreateApostaDialog({ open, onOpenChange, onSuccess }: CreateApos
                               value={categorySearch}
                               onValueChange={setCategorySearch}
                             />
-                            <CommandList>
+                            <CommandList className="max-h-64">
                               <CommandEmpty>Nenhuma categoria encontrada.</CommandEmpty>
                               <CommandGroup>
-                                <div className="max-h-64 overflow-y-auto">
-                                  {filteredCategorias.map((cat) => (
-                                    <CommandItem
-                                      key={cat}
-                                      value={cat}
-                                      onSelect={() => {
+                                {filteredCategorias.map((cat) => (
+                                  <CommandItem
+                                    key={cat}
+                                    value={cat}
+                                    onSelect={() => {
+                                      const currentValue = field.value || [];
+                                      const newValue = currentValue.includes(cat)
+                                        ? currentValue.filter((v) => v !== cat)
+                                        : [...currentValue, cat];
+                                      field.onChange(newValue);
+                                    }}
+                                    className="flex items-center space-x-2 cursor-pointer"
+                                  >
+                                    <Checkbox
+                                      checked={field.value?.includes(cat)}
+                                      onCheckedChange={(checked) => {
                                         const currentValue = field.value || [];
-                                        const newValue = currentValue.includes(cat)
-                                          ? currentValue.filter((v) => v !== cat)
-                                          : [...currentValue, cat];
+                                        const newValue = checked
+                                          ? [...currentValue, cat]
+                                          : currentValue.filter((v) => v !== cat);
                                         field.onChange(newValue);
                                       }}
-                                      className="flex items-center space-x-2 cursor-pointer"
-                                    >
-                                      <Checkbox
-                                        checked={field.value?.includes(cat)}
-                                        onCheckedChange={(checked) => {
-                                          const currentValue = field.value || [];
-                                          const newValue = checked
-                                            ? [...currentValue, cat]
-                                            : currentValue.filter((v) => v !== cat);
-                                          field.onChange(newValue);
-                                        }}
-                                      />
-                                      <span className="flex-1">{cat}</span>
-                                      {field.value?.includes(cat) && (
-                                        <Check className="h-4 w-4 text-primary" />
-                                      )}
-                                    </CommandItem>
-                                  ))}
-                                </div>
+                                    />
+                                    <span className="flex-1">{cat}</span>
+                                    {field.value?.includes(cat) && (
+                                      <Check className="h-4 w-4 text-primary" />
+                                    )}
+                                  </CommandItem>
+                                ))}
                               </CommandGroup>
                             </CommandList>
                           </Command>
