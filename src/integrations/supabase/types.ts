@@ -28,7 +28,7 @@ export type Database = {
           tipo_aposta: string | null
           torneio: string | null
           turbo: number | null
-          user_id: string
+          user_id: string | null
           valor_apostado: number | null
           valor_final: number | null
         }
@@ -45,7 +45,7 @@ export type Database = {
           tipo_aposta?: string | null
           torneio?: string | null
           turbo?: number | null
-          user_id?: string
+          user_id?: string | null
           valor_apostado?: number | null
           valor_final?: number | null
         }
@@ -62,7 +62,7 @@ export type Database = {
           tipo_aposta?: string | null
           torneio?: string | null
           turbo?: number | null
-          user_id?: string
+          user_id?: string | null
           valor_apostado?: number | null
           valor_final?: number | null
         }
@@ -85,7 +85,7 @@ export type Database = {
           last_update: string | null
           last_withdraw: string | null
           name: string
-          user_id: string
+          user_id: string | null
         }
         Insert: {
           balance?: number | null
@@ -95,7 +95,7 @@ export type Database = {
           last_update?: string | null
           last_withdraw?: string | null
           name: string
-          user_id?: string
+          user_id?: string | null
         }
         Update: {
           balance?: number | null
@@ -105,7 +105,7 @@ export type Database = {
           last_update?: string | null
           last_withdraw?: string | null
           name?: string
-          user_id?: string
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -159,7 +159,7 @@ export type Database = {
           monthly_goal: number | null
           result: boolean | null
           updated_at: string | null
-          user_id: string
+          user_id: string | null
         }
         Insert: {
           created_at?: string | null
@@ -169,7 +169,7 @@ export type Database = {
           monthly_goal?: number | null
           result?: boolean | null
           updated_at?: string | null
-          user_id?: string
+          user_id?: string | null
         }
         Update: {
           created_at?: string | null
@@ -179,7 +179,7 @@ export type Database = {
           monthly_goal?: number | null
           result?: boolean | null
           updated_at?: string | null
-          user_id?: string
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -220,7 +220,7 @@ export type Database = {
           description: string | null
           id: number
           type: string
-          user_id: string
+          user_id: string | null
         }
         Insert: {
           amount: number
@@ -229,7 +229,7 @@ export type Database = {
           description?: string | null
           id?: number
           type: string
-          user_id?: string
+          user_id?: string | null
         }
         Update: {
           amount?: number
@@ -238,7 +238,7 @@ export type Database = {
           description?: string | null
           id?: number
           type?: string
-          user_id?: string
+          user_id?: string | null
         }
         Relationships: [
           {
