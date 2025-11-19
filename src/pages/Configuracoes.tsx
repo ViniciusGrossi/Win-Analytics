@@ -8,15 +8,85 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { useTheme } from "next-themes";
 import { Moon, Sun, User, Mail, Shield } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
+import { supabase } from "@/integrations/supabase/client";
+
+const passwordSchema = z.object({
+  currentPassword: z.string().min(6, "A senha deve ter no mínimo 6 caracteres"),
+  newPassword: z.string().min(6, "A senha deve ter no mínimo 6 caracteres"),
+  confirmPassword: z.string().min(6, "A senha deve ter no mínimo 6 caracteres"),
+}).refine((data) => data.newPassword === data.confirmPassword, {
+  message: "As senhas não coincidem",
+  path: ["confirmPassword"],
+});
 
 export default function Configuracoes() {
   const { user } = useAuth();
   const { theme, setTheme } = useTheme();
   const [notificacoes, setNotificacoes] = useState(true);
   const [emailMarketing, setEmailMarketing] = useState(false);
+  const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
+
+  const form = useForm<z.infer<typeof passwordSchema>>({
+    resolver: zodResolver(passwordSchema),
+    defaultValues: {
+      currentPassword: "",
+      newPassword: "",
+      confirmPassword: "",
+    },
+  });
 
   const handleSavePreferences = () => {
     toast.success("Preferências salvas com sucesso!");
+  };
+
+  const handleChangePassword = async (values: z.infer<typeof passwordSchema>) => {
+    try {
+      // Primeiro, verificamos a senha atual fazendo login
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: user?.email || "",
+        password: values.currentPassword,
+      });
+
+      if (signInError) {
+        toast.error("Senha atual incorreta");
+        return;
+      }
+
+      // Se a senha atual está correta, atualizamos para a nova
+      const { error: updateError } = await supabase.auth.updateUser({
+        password: values.newPassword,
+      });
+
+      if (updateError) {
+        toast.error("Erro ao alterar senha: " + updateError.message);
+        return;
+      }
+
+      toast.success("Senha alterada com sucesso!");
+      setIsPasswordDialogOpen(false);
+      form.reset();
+    } catch (error) {
+      toast.error("Erro ao alterar senha");
+    }
   };
 
   return (
@@ -150,14 +220,72 @@ export default function Configuracoes() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <Button variant="outline" className="w-full" disabled>
-              Alterar Senha
-            </Button>
+            <Dialog open={isPasswordDialogOpen} onOpenChange={setIsPasswordDialogOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" className="w-full">
+                  Alterar Senha
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Alterar Senha</DialogTitle>
+                  <DialogDescription>
+                    Digite sua senha atual e a nova senha desejada
+                  </DialogDescription>
+                </DialogHeader>
+                <Form {...form}>
+                  <form onSubmit={form.handleSubmit(handleChangePassword)} className="space-y-4">
+                    <FormField
+                      control={form.control}
+                      name="currentPassword"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Senha Atual</FormLabel>
+                          <FormControl>
+                            <Input type="password" placeholder="Digite sua senha atual" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="newPassword"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Nova Senha</FormLabel>
+                          <FormControl>
+                            <Input type="password" placeholder="Digite a nova senha" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="confirmPassword"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Confirmar Nova Senha</FormLabel>
+                          <FormControl>
+                            <Input type="password" placeholder="Confirme a nova senha" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <Button type="submit" className="w-full">
+                      Alterar Senha
+                    </Button>
+                  </form>
+                </Form>
+              </DialogContent>
+            </Dialog>
             <Button variant="outline" className="w-full" disabled>
               Autenticação em Dois Fatores
             </Button>
             <p className="text-xs text-muted-foreground">
-              Recursos de segurança em breve
+              Autenticação em dois fatores em breve
             </p>
           </CardContent>
         </Card>
