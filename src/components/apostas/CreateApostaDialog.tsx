@@ -10,21 +10,23 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "@/hooks/use-toast";
 import { bookiesService } from "@/services/bookies";
 import { apostasService } from "@/services/apostas";
 import type { Bookie, ApostaFormData } from "@/types/betting";
 import { formatCurrency, cn } from "@/lib/utils";
-import { CalendarIcon, TrendingUp, Wallet, Zap, Gift, Info } from "lucide-react";
+import { CalendarIcon, TrendingUp, Wallet, Zap, Gift, Info, X } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { motion, AnimatePresence } from "framer-motion";
+import { Badge } from "@/components/ui/badge";
 
 const formSchema = z.object({
-  categoria: z.string().min(1, "Categoria é obrigatória"),
+  categoria: z.array(z.string()).min(1, "Selecione ao menos uma categoria"),
   tipo_aposta: z.string().min(1, "Tipo de aposta é obrigatório"),
   casa_de_apostas: z.string().min(1, "Casa de apostas é obrigatória"),
-  valor_apostado: z.number().min(0.01, "Valor mínimo é R$ 0,01"),
+  valor_apostado: z.number().min(0, "Valor não pode ser negativo"),
   odd: z.number().min(1.01, "Odd mínima é 1.01"),
   bonus: z.number().min(0).default(0),
   turbo: z.number().min(0).default(0),
@@ -32,6 +34,15 @@ const formSchema = z.object({
   partida: z.string().optional(),
   torneio: z.string().optional(),
   data: z.date({ required_error: "Data é obrigatória" }),
+}).refine((data) => {
+  // Se não tem bônus, valor apostado deve ser maior que 0
+  if (data.bonus === 0 || data.bonus === undefined) {
+    return data.valor_apostado > 0;
+  }
+  return true;
+}, {
+  message: "Valor apostado deve ser maior que 0 (ou adicione um bônus)",
+  path: ["valor_apostado"],
 });
 
 type FormData = z.infer<typeof formSchema>;
@@ -111,7 +122,7 @@ export function CreateApostaDialog({ open, onOpenChange, onSuccess }: CreateApos
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      categoria: "",
+      categoria: [],
       tipo_aposta: "",
       casa_de_apostas: "",
       valor_apostado: undefined as any,
@@ -162,6 +173,7 @@ export function CreateApostaDialog({ open, onOpenChange, onSuccess }: CreateApos
       return;
     }
 
+    // Validação de saldo: apenas o valor apostado (não bônus) deve ser descontado
     if (data.valor_apostado > (selectedBookie.balance || 0)) {
       toast({ 
         title: "Saldo Insuficiente", 
@@ -174,7 +186,7 @@ export function CreateApostaDialog({ open, onOpenChange, onSuccess }: CreateApos
     setIsLoading(true);
     try {
       const apostaData: ApostaFormData = {
-        categoria: data.categoria,
+        categoria: data.categoria.join(", "), // Converte array para string separada por vírgula
         tipo_aposta: data.tipo_aposta,
         casa_de_apostas: data.casa_de_apostas,
         valor_apostado: data.valor_apostado,
@@ -187,7 +199,7 @@ export function CreateApostaDialog({ open, onOpenChange, onSuccess }: CreateApos
         data: format(data.data, "yyyy-MM-dd"),
       };
 
-      await apostasService.create(apostaData, selectedBookie.balance || 0);
+      await apostasService.create(apostaData, selectedBookie.balance || 0, hasBonus);
 
       toast({ title: "Sucesso!", description: "Aposta criada com sucesso" });
       form.reset();
@@ -273,21 +285,76 @@ export function CreateApostaDialog({ open, onOpenChange, onSuccess }: CreateApos
                 name="categoria"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Categoria</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione a categoria" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {categorias.map((cat) => (
-                          <SelectItem key={cat} value={cat}>
+                    <FormLabel>Categorias</FormLabel>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            variant="outline"
+                            role="combobox"
+                            className={cn(
+                              "w-full justify-between",
+                              field.value.length === 0 && "text-muted-foreground"
+                            )}
+                          >
+                            {field.value.length === 0
+                              ? "Selecione categorias"
+                              : `${field.value.length} selecionada(s)`}
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-full p-0" align="start">
+                        <div className="max-h-64 overflow-y-auto p-2">
+                          {categorias.map((cat) => (
+                            <div
+                              key={cat}
+                              className="flex items-center space-x-2 p-2 hover:bg-accent rounded-sm cursor-pointer"
+                              onClick={() => {
+                                const currentValue = field.value || [];
+                                const newValue = currentValue.includes(cat)
+                                  ? currentValue.filter((v) => v !== cat)
+                                  : [...currentValue, cat];
+                                field.onChange(newValue);
+                              }}
+                            >
+                              <Checkbox
+                                checked={field.value?.includes(cat)}
+                                onCheckedChange={(checked) => {
+                                  const currentValue = field.value || [];
+                                  const newValue = checked
+                                    ? [...currentValue, cat]
+                                    : currentValue.filter((v) => v !== cat);
+                                  field.onChange(newValue);
+                                }}
+                              />
+                              <label className="flex-1 cursor-pointer text-sm">
+                                {cat}
+                              </label>
+                            </div>
+                          ))}
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+                    {field.value.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-2">
+                        {field.value.map((cat) => (
+                          <Badge
+                            key={cat}
+                            variant="secondary"
+                            className="text-xs"
+                          >
                             {cat}
-                          </SelectItem>
+                            <X
+                              className="h-3 w-3 ml-1 cursor-pointer"
+                              onClick={() => {
+                                const newValue = field.value.filter((v) => v !== cat);
+                                field.onChange(newValue);
+                              }}
+                            />
+                          </Badge>
                         ))}
-                      </SelectContent>
-                    </Select>
+                      </div>
+                    )}
                     <FormMessage />
                   </FormItem>
                 )}

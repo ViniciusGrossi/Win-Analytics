@@ -54,10 +54,11 @@ export const apostasService = {
     return { data: data as Aposta[], count: count || 0 };
   },
 
-  async create(dto: ApostaFormData, bookieBalance: number) {
+  async create(dto: ApostaFormData, bookieBalance: number, hasBonus: boolean = false) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("Usuário não autenticado");
 
+    // Apenas validar saldo do valor apostado (não bônus)
     if (bookieBalance < dto.valor_apostado) {
       throw new Error("Saldo insuficiente na casa de apostas");
     }
@@ -76,6 +77,7 @@ export const apostasService = {
 
     if (apostaError) throw apostaError;
 
+    // Descontar apenas o valor apostado (não o bônus) da casa de apostas
     const { error: balanceError } = await supabase
       .from("bookies")
       .update({ 
@@ -99,21 +101,32 @@ export const apostasService = {
     let updateBalance = 0;
 
     if (resultado === "Ganhou") {
+      // Lucro do valor apostado normal
       const lucroBase = (apostaData.valor_apostado || 0) * ((apostaData.odd || 1) - 1);
+      
+      // Lucro do bônus (apenas o lucro, não retorna o valor do bônus)
       const lucroBonus = (apostaData.bonus || 0) * ((apostaData.odd || 1) - 1);
+      
+      // Turbo aplicado sobre o lucro total
       const turbo = apostaData.turbo || 0;
       const isPercentTurbo = turbo > 0 && turbo <= 1;
       const turboProfit = isPercentTurbo ? (lucroBase + lucroBonus) * turbo : turbo;
+      
       const lucroTotal = (lucroBase + lucroBonus) + turboProfit;
       valor_final = lucroTotal;
-      updateBalance = (apostaData.valor_apostado || 0) + lucroTotal;
+      
+      // Retornar à banca: valor apostado + lucro base + lucro bonus (não retorna o valor do bônus original)
+      updateBalance = (apostaData.valor_apostado || 0) + lucroBase + lucroBonus + turboProfit;
     } else if (resultado === "Perdeu") {
+      // Perde apenas o valor apostado, bônus já não estava na banca
       valor_final = -(apostaData.valor_apostado || 0);
       updateBalance = 0;
     } else if (resultado === "Cancelado") {
       valor_final = 0;
+      // Retorna apenas o valor apostado (bônus não estava na banca)
       updateBalance = (apostaData.valor_apostado || 0);
     } else if (resultado === "Cashout" && cashoutValue) {
+      // No cashout, considerar que o valor do cashout já inclui tudo
       valor_final = cashoutValue - (apostaData.valor_apostado || 0);
       updateBalance = cashoutValue;
     }
