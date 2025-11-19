@@ -7,7 +7,6 @@ import { ApostasTable } from "@/components/apostas/ApostasTable";
 import { CreateApostaDialog } from "@/components/apostas/CreateApostaDialog";
 import { ApostasFilters } from "@/components/apostas/ApostasFilters";
 import { ApostasStats } from "@/components/apostas/ApostasStats";
-import { KellyCalculator } from "@/components/apostas/KellyCalculator";
 import type { Aposta, ResultadoType } from "@/types/betting";
 
 export default function Apostas() {
@@ -58,7 +57,6 @@ export default function Apostas() {
           <p className="text-muted-foreground mt-1 text-sm sm:text-base">Gerencie todas as suas apostas</p>
         </div>
         <div className="flex gap-2 w-full sm:w-auto">
-          <KellyCalculator />
           <Button onClick={loadApostas} size="default" variant="outline" className="gap-2 flex-1 sm:flex-initial">
             <RefreshCw className="h-4 w-4" />
             <span className="hidden sm:inline">Atualizar</span>
