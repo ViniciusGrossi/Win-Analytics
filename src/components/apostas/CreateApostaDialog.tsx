@@ -113,6 +113,7 @@ const turboOptions = [
 export function CreateApostaDialog({ open, onOpenChange, onSuccess }: CreateApostaDialogProps) {
   const [bookies, setBookies] = useState<Bookie[]>([]);
   const [selectedBookie, setSelectedBookie] = useState<Bookie | null>(null);
+  const [categorySearch, setCategorySearch] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [hasBonus, setHasBonus] = useState(false);
   const [selectedTurbo, setSelectedTurbo] = useState(0);
@@ -207,10 +208,18 @@ export function CreateApostaDialog({ open, onOpenChange, onSuccess }: CreateApos
 
       await apostasService.create(apostaData, selectedBookie.balance || 0, hasBonus);
 
+      // Animação de sucesso
+      const element = document.querySelector('[role="dialog"]');
+      if (element) {
+        element.classList.add('animate-[scale-in_0.2s_ease-out]');
+        await new Promise(resolve => setTimeout(resolve, 200));
+      }
+
       toast({ title: "Sucesso!", description: "Aposta criada com sucesso" });
       form.reset();
       setHasBonus(false);
       setSelectedTurbo(0);
+      setCategorySearch("");
       onSuccess();
       onOpenChange(false);
     } catch (error) {
@@ -297,81 +306,101 @@ export function CreateApostaDialog({ open, onOpenChange, onSuccess }: CreateApos
               <FormField
                 control={form.control}
                 name="categoria"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Categorias</FormLabel>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <FormControl>
-                          <Button
-                            variant="outline"
-                            role="combobox"
-                            className={cn(
-                              "w-full justify-between",
-                              field.value.length === 0 && "text-muted-foreground"
-                            )}
-                          >
-                            {field.value.length === 0
-                              ? "Selecione categorias"
-                              : `${field.value.length} selecionada(s)`}
-                          </Button>
-                        </FormControl>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-full p-0" align="start">
-                        <div className="max-h-64 overflow-y-auto p-2">
-                          {categorias.map((cat) => (
-                            <div
-                              key={cat}
-                              className="flex items-center space-x-2 p-2 hover:bg-accent rounded-sm cursor-pointer"
-                              onClick={() => {
-                                const currentValue = field.value || [];
-                                const newValue = currentValue.includes(cat)
-                                  ? currentValue.filter((v) => v !== cat)
-                                  : [...currentValue, cat];
-                                field.onChange(newValue);
-                              }}
+                render={({ field }) => {
+                  const filteredCategorias = categorias.filter((cat) =>
+                    cat.toLowerCase().includes(categorySearch.toLowerCase())
+                  );
+                  
+                  return (
+                    <FormItem>
+                      <FormLabel>Categorias</FormLabel>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <FormControl>
+                            <Button
+                              variant="outline"
+                              role="combobox"
+                              className={cn(
+                                "w-full justify-between",
+                                field.value.length === 0 && "text-muted-foreground"
+                              )}
                             >
-                              <Checkbox
-                                checked={field.value?.includes(cat)}
-                                onCheckedChange={(checked) => {
-                                  const currentValue = field.value || [];
-                                  const newValue = checked
-                                    ? [...currentValue, cat]
-                                    : currentValue.filter((v) => v !== cat);
+                              {field.value.length === 0
+                                ? "Selecione categorias"
+                                : `${field.value.length} selecionada(s)`}
+                            </Button>
+                          </FormControl>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-full p-0" align="start">
+                          <Command>
+                            <CommandInput 
+                              placeholder="Buscar categoria..." 
+                              value={categorySearch}
+                              onValueChange={setCategorySearch}
+                            />
+                            <CommandList>
+                              <CommandEmpty>Nenhuma categoria encontrada.</CommandEmpty>
+                              <CommandGroup>
+                                <div className="max-h-64 overflow-y-auto">
+                                  {filteredCategorias.map((cat) => (
+                                    <CommandItem
+                                      key={cat}
+                                      value={cat}
+                                      onSelect={() => {
+                                        const currentValue = field.value || [];
+                                        const newValue = currentValue.includes(cat)
+                                          ? currentValue.filter((v) => v !== cat)
+                                          : [...currentValue, cat];
+                                        field.onChange(newValue);
+                                      }}
+                                      className="flex items-center space-x-2 cursor-pointer"
+                                    >
+                                      <Checkbox
+                                        checked={field.value?.includes(cat)}
+                                        onCheckedChange={(checked) => {
+                                          const currentValue = field.value || [];
+                                          const newValue = checked
+                                            ? [...currentValue, cat]
+                                            : currentValue.filter((v) => v !== cat);
+                                          field.onChange(newValue);
+                                        }}
+                                      />
+                                      <span className="flex-1">{cat}</span>
+                                      {field.value?.includes(cat) && (
+                                        <Check className="h-4 w-4 text-primary" />
+                                      )}
+                                    </CommandItem>
+                                  ))}
+                                </div>
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
+                      {field.value.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-2">
+                          {field.value.map((cat) => (
+                            <Badge
+                              key={cat}
+                              variant="secondary"
+                              className="text-xs"
+                            >
+                              {cat}
+                              <X
+                                className="h-3 w-3 ml-1 cursor-pointer"
+                                onClick={() => {
+                                  const newValue = field.value.filter((v) => v !== cat);
                                   field.onChange(newValue);
                                 }}
                               />
-                              <label className="flex-1 cursor-pointer text-sm">
-                                {cat}
-                              </label>
-                            </div>
+                            </Badge>
                           ))}
                         </div>
-                      </PopoverContent>
-                    </Popover>
-                    {field.value.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mt-2">
-                        {field.value.map((cat) => (
-                          <Badge
-                            key={cat}
-                            variant="secondary"
-                            className="text-xs"
-                          >
-                            {cat}
-                            <X
-                              className="h-3 w-3 ml-1 cursor-pointer"
-                              onClick={() => {
-                                const newValue = field.value.filter((v) => v !== cat);
-                                field.onChange(newValue);
-                              }}
-                            />
-                          </Badge>
-                        ))}
-                      </div>
-                    )}
-                    <FormMessage />
-                  </FormItem>
-                )}
+                      )}
+                      <FormMessage />
+                    </FormItem>
+                  );
+                }}
               />
 
               <FormField
