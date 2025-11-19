@@ -15,9 +15,13 @@ export interface ListParams {
 
 export const apostasService = {
   async list(params: ListParams = {}) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Usuário não autenticado");
+
     let query = supabase
       .from("aposta")
       .select("*", { count: "exact" })
+      .eq("user_id", user.id)
       .order("data", { ascending: false });
 
     if (params.startDate) {
@@ -51,6 +55,9 @@ export const apostasService = {
   },
 
   async create(dto: ApostaFormData, bookieBalance: number) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Usuário não autenticado");
+
     if (bookieBalance < dto.valor_apostado) {
       throw new Error("Saldo insuficiente na casa de apostas");
     }
@@ -60,6 +67,7 @@ export const apostasService = {
       .from("aposta")
       .insert({
         ...dto,
+        user_id: user.id,
         resultado: "Pendente",
         valor_final: 0,
       })

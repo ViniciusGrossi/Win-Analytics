@@ -1,11 +1,26 @@
-import { Moon, Sun } from "lucide-react";
+import { Moon, Sun, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { useTheme } from "next-themes";
 import { motion } from "framer-motion";
+import { useAuth } from "@/hooks/useAuth";
+import { toast } from "sonner";
+import { useNavigate } from "react-router-dom";
 
 export function Topbar() {
   const { theme, setTheme } = useTheme();
+  const { signOut, user } = useAuth();
+  const navigate = useNavigate();
+
+  const handleSignOut = async () => {
+    const { error } = await signOut();
+    if (error) {
+      toast.error("Erro ao sair");
+    } else {
+      toast.success("Logout realizado com sucesso!");
+      navigate("/auth");
+    }
+  };
 
   return (
     <motion.header
@@ -15,6 +30,11 @@ export function Topbar() {
     >
       <SidebarTrigger />
       <div className="flex-1" />
+      {user && (
+        <span className="text-sm text-muted-foreground hidden sm:inline">
+          {user.email}
+        </span>
+      )}
       <Button
         variant="ghost"
         size="icon"
@@ -24,6 +44,15 @@ export function Topbar() {
         <Sun className="h-5 w-5 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
         <Moon className="absolute h-5 w-5 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
         <span className="sr-only">Toggle theme</span>
+      </Button>
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={handleSignOut}
+        className="rounded-full"
+      >
+        <LogOut className="h-5 w-5" />
+        <span className="sr-only">Sair</span>
       </Button>
     </motion.header>
   );

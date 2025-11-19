@@ -3,9 +3,13 @@ import type { Bookie } from "@/types/betting";
 
 export const bookiesService = {
   async list() {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Usuário não autenticado");
+
     const { data, error } = await supabase
       .from("bookies")
       .select("*")
+      .eq("user_id", user.id)
       .order("name", { ascending: true });
 
     if (error) throw error;
@@ -13,10 +17,14 @@ export const bookiesService = {
   },
 
   async getByName(name: string) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Usuário não autenticado");
+
     const { data, error } = await supabase
       .from("bookies")
       .select("*")
       .eq("name", name)
+      .eq("user_id", user.id)
       .single();
 
     if (error) throw error;
@@ -36,9 +44,12 @@ export const bookiesService = {
   },
 
   async create(name: string, initialBalance: number = 0) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Usuário não autenticado");
+
     const { data, error } = await supabase
       .from("bookies")
-      .insert({ name, balance: initialBalance })
+      .insert({ name, balance: initialBalance, user_id: user.id })
       .select()
       .single();
 
