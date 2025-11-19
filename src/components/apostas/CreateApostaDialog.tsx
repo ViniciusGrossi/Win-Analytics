@@ -39,8 +39,8 @@ const formSchema = z.object({
   // Pelo menos um dos dois deve ser maior que 0: valor apostado ou bônus
   return data.valor_apostado > 0 || data.bonus > 0;
 }, {
-  message: "Valor apostado ou bônus deve ser maior que 0",
-  path: ["valor_apostado"],
+  message: "Informe um valor apostado ou bônus",
+  path: ["bonus"], // Colocar o erro no campo de bônus ao invés de valor_apostado
 });
 
 type FormData = z.infer<typeof formSchema>;
@@ -125,7 +125,7 @@ export function CreateApostaDialog({ open, onOpenChange, onSuccess }: CreateApos
       categoria: [],
       tipo_aposta: "",
       casa_de_apostas: "",
-      valor_apostado: undefined as any,
+      valor_apostado: 0,
       odd: undefined as any,
       bonus: 0,
       turbo: 0,
@@ -482,10 +482,10 @@ export function CreateApostaDialog({ open, onOpenChange, onSuccess }: CreateApos
                       <Input
                         type="number"
                         step="0.01"
-                        placeholder="Digite o valor"
+                        placeholder="0.00"
                         {...field}
-                        value={field.value || ""}
-                        onChange={(e) => field.onChange(e.target.value ? parseFloat(e.target.value) : undefined)}
+                        value={field.value === 0 ? "0" : field.value || ""}
+                        onChange={(e) => field.onChange(e.target.value ? parseFloat(e.target.value) : 0)}
                       />
                     </FormControl>
                     <FormMessage />
