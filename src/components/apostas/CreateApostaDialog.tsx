@@ -16,11 +16,12 @@ import { bookiesService } from "@/services/bookies";
 import { apostasService } from "@/services/apostas";
 import type { Bookie, ApostaFormData } from "@/types/betting";
 import { formatCurrency, cn } from "@/lib/utils";
-import { CalendarIcon, TrendingUp, Wallet, Zap, Gift, Info, X } from "lucide-react";
+import { CalendarIcon, TrendingUp, Wallet, Zap, Gift, Info, X, Check, ChevronsUpDown } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { motion, AnimatePresence } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 
 const formSchema = z.object({
   categoria: z.array(z.string()).min(1, "Selecione ao menos uma categoria"),
@@ -35,13 +36,10 @@ const formSchema = z.object({
   torneio: z.string().optional(),
   data: z.date({ required_error: "Data é obrigatória" }),
 }).refine((data) => {
-  // Se não tem bônus, valor apostado deve ser maior que 0
-  if (data.bonus === 0 || data.bonus === undefined) {
-    return data.valor_apostado > 0;
-  }
-  return true;
+  // Pelo menos um dos dois deve ser maior que 0: valor apostado ou bônus
+  return data.valor_apostado > 0 || data.bonus > 0;
 }, {
-  message: "Valor apostado deve ser maior que 0 (ou adicione um bônus)",
+  message: "Valor apostado ou bônus deve ser maior que 0",
   path: ["valor_apostado"],
 });
 
@@ -118,6 +116,8 @@ export function CreateApostaDialog({ open, onOpenChange, onSuccess }: CreateApos
   const [isLoading, setIsLoading] = useState(false);
   const [hasBonus, setHasBonus] = useState(false);
   const [selectedTurbo, setSelectedTurbo] = useState(0);
+  const [bookieOpen, setBookieOpen] = useState(false);
+  const [tournamentOpen, setTournamentOpen] = useState(false);
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -136,16 +136,22 @@ export function CreateApostaDialog({ open, onOpenChange, onSuccess }: CreateApos
   });
 
   const valorApostado = form.watch("valor_apostado") || 0;
-  const odd = form.watch("odd") || 0;
+  const odd = form.watch("odd") || 1;
   const bonus = form.watch("bonus") || 0;
-  const turbo = selectedTurbo;
-
-  // Cálculo correto: turbo é aplicado sobre o LUCRO, não sobre o retorno total
-  const lucroBase = valorApostado * Math.max((odd || 0) - 1, 0);
-  const lucroBonus = (hasBonus ? bonus : 0) * Math.max((odd || 0) - 1, 0);
-  const retornoBase = valorApostado + lucroBase;
-  const turboProfit = (lucroBase + lucroBonus) * turbo;
-  const lucroPotencial = (lucroBase + lucroBonus) * (1 + turbo);
+  const turbo = form.watch("turbo") || 0;
+  
+  // Calcular lucro base (do dinheiro real) e lucro do bônus separadamente
+  const lucroBase = valorApostado * (odd - 1);
+  const lucroBonus = bonus * (odd - 1);
+  const lucroTotal = lucroBase + lucroBonus;
+  
+  // Turbo aplica sobre o lucro total
+  const turboProfit = lucroTotal * turbo;
+  
+  // Lucro potencial total
+  const lucroPotencial = lucroTotal + turboProfit;
+  
+  // Retorno potencial = valor apostado + lucro total + turbo
   const retornoPotencial = valorApostado + lucroPotencial;
 
   useEffect(() => {
@@ -250,19 +256,25 @@ export function CreateApostaDialog({ open, onOpenChange, onSuccess }: CreateApos
                     {formatCurrency(retornoPotencial)}
                   </div>
                   <div className="text-sm text-muted-foreground space-y-1">
-                    <div className="flex justify-between">
-                      <span>Retorno base:</span>
-                      <span className="text-foreground font-semibold">{formatCurrency(retornoBase)}</span>
-                    </div>
-                    {hasBonus && bonus > 0 && (
-                      <div className="flex justify-between text-green-600">
-                        <span>+ Lucro do bônus:</span>
-                        <span className="font-semibold">{formatCurrency(lucroBonus)}</span>
+                    {valorApostado > 0 && (
+                      <div className="flex justify-between">
+                        <span>Valor apostado:</span>
+                        <span className="text-foreground font-semibold">{formatCurrency(valorApostado)}</span>
                       </div>
                     )}
+                    {bonus > 0 && (
+                      <div className="flex justify-between">
+                        <span>Bônus:</span>
+                        <span className="text-foreground font-semibold">{formatCurrency(bonus)}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between">
+                      <span>Lucro base:</span>
+                      <span className="text-green-600 font-semibold">{formatCurrency(lucroTotal)}</span>
+                    </div>
                     {turboProfit > 0 && (
                       <div className="flex justify-between text-blue-600">
-                        <span>+ Turbo ({(turbo * 100).toFixed(0)}%):</span>
+                        <span>+ Lucro do turbo:</span>
                         <span className="font-semibold">{formatCurrency(turboProfit)}</span>
                       </div>
                     )}
@@ -270,10 +282,12 @@ export function CreateApostaDialog({ open, onOpenChange, onSuccess }: CreateApos
                       <span>Lucro:</span>
                       <span className="text-foreground font-bold">{formatCurrency(lucroPotencial)}</span>
                     </div>
-                    <div className="flex justify-between">
-                      <span>ROI:</span>
-                      <span className="text-foreground font-bold">{((lucroPotencial / valorApostado) * 100).toFixed(2)}%</span>
-                    </div>
+                    {valorApostado > 0 && (
+                      <div className="flex justify-between">
+                        <span>ROI:</span>
+                        <span className="text-foreground font-bold">{((lucroPotencial / valorApostado) * 100).toFixed(2)}%</span>
+                      </div>
+                    )}
                   </div>
                 </motion.div>
               )}
@@ -390,37 +404,62 @@ export function CreateApostaDialog({ open, onOpenChange, onSuccess }: CreateApos
               control={form.control}
               name="casa_de_apostas"
               render={({ field }) => (
-                <FormItem>
+                <FormItem className="flex flex-col">
                   <FormLabel className="flex items-center gap-2">
                     <Wallet className="h-4 w-4" />
                     Casa de Apostas
                   </FormLabel>
-                  <Select
-                    onValueChange={(value) => {
-                      field.onChange(value);
-                      const bookie = bookies.find((b) => b.name === value);
-                      setSelectedBookie(bookie || null);
-                    }}
-                    value={field.value}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione a casa" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {bookies.map((bookie) => (
-                        <SelectItem key={bookie.id} value={bookie.name}>
-                          <div className="flex items-center justify-between w-full">
-                            <span>{bookie.name}</span>
-                            <span className="text-xs text-muted-foreground ml-4">
-                              {formatCurrency(bookie.balance || 0)}
-                            </span>
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Popover open={bookieOpen} onOpenChange={setBookieOpen}>
+                    <PopoverTrigger asChild>
+                      <FormControl>
+                        <Button
+                          variant="outline"
+                          role="combobox"
+                          className={cn(
+                            "justify-between",
+                            !field.value && "text-muted-foreground"
+                          )}
+                        >
+                          {field.value || "Selecione a casa"}
+                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      </FormControl>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[300px] p-0">
+                      <Command>
+                        <CommandInput placeholder="Buscar casa de apostas..." />
+                        <CommandList>
+                          <CommandEmpty>Nenhuma casa encontrada.</CommandEmpty>
+                          <CommandGroup>
+                            {bookies.map((bookie) => (
+                              <CommandItem
+                                key={bookie.id}
+                                value={bookie.name}
+                                onSelect={() => {
+                                  field.onChange(bookie.name);
+                                  setSelectedBookie(bookie);
+                                  setBookieOpen(false);
+                                }}
+                              >
+                                <Check
+                                  className={cn(
+                                    "mr-2 h-4 w-4",
+                                    field.value === bookie.name ? "opacity-100" : "opacity-0"
+                                  )}
+                                />
+                                <div className="flex items-center justify-between w-full">
+                                  <span>{bookie.name}</span>
+                                  <span className="text-xs text-muted-foreground ml-4">
+                                    {formatCurrency(bookie.balance || 0)}
+                                  </span>
+                                </div>
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
                   {selectedBookie && (
                     <p className="text-xs text-muted-foreground flex items-center gap-1">
                       <Info className="h-3 w-3" />
@@ -561,22 +600,53 @@ export function CreateApostaDialog({ open, onOpenChange, onSuccess }: CreateApos
                 control={form.control}
                 name="torneio"
                 render={({ field }) => (
-                  <FormItem>
+                  <FormItem className="flex flex-col">
                     <FormLabel>Torneio</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione o torneio" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {torneios.map((torneio) => (
-                          <SelectItem key={torneio} value={torneio}>
-                            {torneio}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <Popover open={tournamentOpen} onOpenChange={setTournamentOpen}>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            variant="outline"
+                            role="combobox"
+                            className={cn(
+                              "justify-between",
+                              !field.value && "text-muted-foreground"
+                            )}
+                          >
+                            {field.value || "Selecione o torneio"}
+                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[300px] p-0">
+                        <Command>
+                          <CommandInput placeholder="Buscar torneio..." />
+                          <CommandList>
+                            <CommandEmpty>Nenhum torneio encontrado.</CommandEmpty>
+                            <CommandGroup>
+                              {torneios.map((torneio) => (
+                                <CommandItem
+                                  key={torneio}
+                                  value={torneio}
+                                  onSelect={() => {
+                                    field.onChange(torneio);
+                                    setTournamentOpen(false);
+                                  }}
+                                >
+                                  <Check
+                                    className={cn(
+                                      "mr-2 h-4 w-4",
+                                      field.value === torneio ? "opacity-100" : "opacity-0"
+                                    )}
+                                  />
+                                  {torneio}
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
                     <FormMessage />
                   </FormItem>
                 )}
