@@ -3,6 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -15,7 +16,7 @@ import { bookiesService } from "@/services/bookies";
 import { apostasService } from "@/services/apostas";
 import type { Bookie, Aposta, ApostaFormData } from "@/types/betting";
 import { formatCurrency, cn } from "@/lib/utils";
-import { CalendarIcon, Wallet, Zap, Gift, Info, Edit, Trash2 } from "lucide-react";
+import { CalendarIcon, Wallet, Zap, Gift, Info, Edit, Trash2, AlertTriangle } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -100,6 +101,7 @@ export function EditApostaDialog({ open, onOpenChange, aposta, onSuccess }: Edit
   const [isLoading, setIsLoading] = useState(false);
   const [hasBonus, setHasBonus] = useState(false);
   const [selectedTurbo, setSelectedTurbo] = useState(0);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -192,14 +194,17 @@ export function EditApostaDialog({ open, onOpenChange, aposta, onSuccess }: Edit
     }
   };
 
+  const handleDeleteClick = () => {
+    setShowDeleteDialog(true);
+  };
+
   const onDelete = async () => {
     if (!aposta) return;
-    const confirmed = window.confirm("Tem certeza que deseja excluir esta aposta?");
-    if (!confirmed) return;
+    setShowDeleteDialog(false);
     setIsLoading(true);
     try {
       await apostasService.remove(aposta.id);
-      toast({ title: "Excluído", description: "Aposta removida" });
+      toast({ title: "Excluído", description: "Aposta removida com sucesso" });
       onSuccess();
       onOpenChange(false);
     } catch (error) {
@@ -438,13 +443,46 @@ export function EditApostaDialog({ open, onOpenChange, aposta, onSuccess }: Edit
               <Button type="submit" className="flex-1" disabled={isLoading}>
                 {isLoading ? "Salvando..." : "Salvar"}
               </Button>
-              <Button type="button" variant="destructive" onClick={onDelete} disabled={isLoading}>
+              <Button type="button" variant="destructive" onClick={handleDeleteClick} disabled={isLoading}>
                 <Trash2 className="h-4 w-4 mr-2" /> Excluir
               </Button>
             </div>
           </form>
         </Form>
       </DialogContent>
+
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <div className="flex items-center gap-2">
+              <div className="h-10 w-10 rounded-full bg-destructive/10 flex items-center justify-center">
+                <AlertTriangle className="h-5 w-5 text-destructive" />
+              </div>
+              <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
+            </div>
+            <AlertDialogDescription className="pt-3">
+              Tem certeza que deseja excluir esta aposta? Esta ação não pode ser desfeita.
+              {aposta && (
+                <div className="mt-3 p-3 bg-muted rounded-md text-sm">
+                  <div><strong>Partida:</strong> {aposta.partida || "N/A"}</div>
+                  <div><strong>Valor:</strong> {formatCurrency(aposta.valor_apostado || 0)}</div>
+                  <div><strong>Odd:</strong> {aposta.odd?.toFixed(2) || "N/A"}</div>
+                </div>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isLoading}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={onDelete}
+              disabled={isLoading}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isLoading ? "Excluindo..." : "Excluir"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
   );
 }
