@@ -332,13 +332,13 @@ export function CreateApostaDialog({ open, onOpenChange, onSuccess }: CreateApos
                           </FormControl>
                         </PopoverTrigger>
                         <PopoverContent className="w-full p-0" align="start">
-                          <Command>
+                          <Command className="max-h-[400px]">
                             <CommandInput 
                               placeholder="Buscar categoria..." 
                               value={categorySearch}
                               onValueChange={setCategorySearch}
                             />
-                            <CommandList className="max-h-64">
+                            <CommandList className="max-h-[320px] overflow-y-auto">
                               <CommandEmpty>Nenhuma categoria encontrada.</CommandEmpty>
                               <CommandGroup>
                                 {filteredCategorias.map((cat) => (
