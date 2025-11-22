@@ -132,27 +132,27 @@ export default function Assistente() {
   };
 
   const handleClearChat = () => {
-    setMessages([messages[0]]); // Keep only the initial message
+    setMessages([messages[0]]);
   };
 
   return (
-    <div className="container mx-auto p-6 max-w-5xl h-[calc(100vh-120px)] flex flex-col">
+    <div className="container mx-auto p-4 max-w-7xl h-[calc(100vh-100px)] flex flex-col">
       {/* Header */}
-      <div className="mb-6">
-        <div className="flex items-center justify-between mb-2">
+      <div className="mb-4">
+        <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="p-3 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/20">
-              <Bot className="h-6 w-6 text-primary" />
+            <div className="p-2.5 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/20">
+              <Bot className="h-5 w-5 text-primary" />
             </div>
             <div>
-              <h1 className="text-3xl font-bold">Assistente IA</h1>
-              <p className="text-muted-foreground">Seu consultor pessoal de apostas inteligente</p>
+              <h1 className="text-2xl font-bold">Assistente IA</h1>
+              <p className="text-sm text-muted-foreground">Seu consultor pessoal de apostas inteligente</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
             <Badge variant="secondary" className="gap-1">
               <Activity className="h-3 w-3" />
-              {messages.length - 1} mensagens
+              {messages.length - 1}
             </Badge>
             {messages.length > 1 && (
               <Button
@@ -161,7 +161,7 @@ export default function Assistente() {
                 onClick={handleClearChat}
                 className="gap-2"
               >
-                <Trash2 className="h-4 w-4" />
+                <Trash2 className="h-3.5 w-3.5" />
                 Limpar
               </Button>
             )}
@@ -169,177 +169,181 @@ export default function Assistente() {
         </div>
       </div>
 
-      {/* Suggestions (only show when chat is empty) */}
-      {messages.length === 1 && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mb-6"
-        >
-          <Tabs defaultValue="Análise" className="w-full">
-            <TabsList className="grid w-full grid-cols-3 mb-4">
-              {suggestionCategories.map((category) => (
-                <TabsTrigger key={category.name} value={category.name} className="gap-2">
-                  <category.icon className="h-4 w-4" />
-                  {category.name}
-                </TabsTrigger>
-              ))}
-            </TabsList>
-            {suggestionCategories.map((category) => (
-              <TabsContent key={category.name} value={category.name}>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {category.suggestions.map((suggestion, index) => (
-                    <motion.div
-                      key={index}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: index * 0.05 }}
-                    >
-                      <Card
-                        className="p-4 hover:bg-accent hover:border-primary/30 cursor-pointer transition-all duration-200 border-border/50 group"
-                        onClick={() => handleSuggestion(suggestion.text)}
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="p-2 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
-                            <suggestion.icon className="h-4 w-4 text-primary" />
-                          </div>
-                          <span className="text-sm font-medium">{suggestion.text}</span>
-                        </div>
-                      </Card>
-                    </motion.div>
-                  ))}
-                </div>
-              </TabsContent>
-            ))}
-          </Tabs>
-        </motion.div>
-      )}
-
-      {/* Chat Area */}
-      <Card className="flex-1 flex flex-col overflow-hidden border-border/50 shadow-lg">
-        <ScrollArea className="flex-1 p-6">
-          <div className="space-y-4">
-            <AnimatePresence>
-              {messages.map((message, index) => (
-                <motion.div
-                  key={message.id}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  transition={{ duration: 0.2 }}
-                  className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
-                >
-                  <div
-                    className={`max-w-[85%] rounded-2xl p-4 ${message.role === "user"
-                        ? "bg-primary text-primary-foreground ml-4"
-                        : "bg-muted mr-4 relative group"
-                      }`}
+      {/* Main Content: Chat + Suggestions */}
+      <div className="flex-1 grid grid-cols-[1fr_320px] gap-4 overflow-hidden">
+        {/* Chat Area - Left Side */}
+        <Card className="flex flex-col overflow-hidden border-border/50 shadow-lg">
+          <ScrollArea className="flex-1 p-6">
+            <div className="space-y-4">
+              <AnimatePresence>
+                {messages.map((message, index) => (
+                  <motion.div
+                    key={message.id}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    transition={{ duration: 0.2 }}
+                    className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
                   >
-                    {message.role === "assistant" && (
-                      <div className="flex items-center justify-between mb-3 pb-2 border-b border-border/50">
-                        <div className="flex items-center gap-2">
-                          <div className="p-1.5 rounded-lg bg-primary/10">
-                            <Bot className="h-3.5 w-3.5 text-primary" />
+                    <div
+                      className={`max-w-[85%] rounded-2xl p-4 ${message.role === "user"
+                          ? "bg-primary text-primary-foreground ml-4"
+                          : "bg-muted mr-4 relative group"
+                        }`}
+                    >
+                      {message.role === "assistant" && (
+                        <div className="flex items-center justify-between mb-3 pb-2 border-b border-border/50">
+                          <div className="flex items-center gap-2">
+                            <div className="p-1.5 rounded-lg bg-primary/10">
+                              <Bot className="h-3.5 w-3.5 text-primary" />
+                            </div>
+                            <span className="text-xs font-semibold text-primary">Wager Art AI</span>
                           </div>
-                          <span className="text-xs font-semibold text-primary">Wager Art AI</span>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                            onClick={() => handleCopy(message.content, message.id)}
+                          >
+                            {copiedId === message.id ? (
+                              <Check className="h-3.5 w-3.5 text-green-500" />
+                            ) : (
+                              <Copy className="h-3.5 w-3.5" />
+                            )}
+                          </Button>
                         </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                          onClick={() => handleCopy(message.content, message.id)}
-                        >
-                          {copiedId === message.id ? (
-                            <Check className="h-3.5 w-3.5 text-green-500" />
-                          ) : (
-                            <Copy className="h-3.5 w-3.5" />
-                          )}
-                        </Button>
-                      </div>
-                    )}
-                    <div className="text-sm leading-relaxed prose prose-sm dark:prose-invert max-w-none">
-                      {message.role === "assistant" ? (
-                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                          {message.content}
-                        </ReactMarkdown>
-                      ) : (
-                        <p className="whitespace-pre-wrap">{message.content}</p>
                       )}
+                      <div className="text-sm leading-relaxed prose prose-sm dark:prose-invert max-w-none">
+                        {message.role === "assistant" ? (
+                          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                            {message.content}
+                          </ReactMarkdown>
+                        ) : (
+                          <p className="whitespace-pre-wrap">{message.content}</p>
+                        )}
+                      </div>
+                      <span className="text-xs opacity-70 mt-2 block">
+                        {message.timestamp.toLocaleTimeString("pt-BR", {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </span>
                     </div>
-                    <span className="text-xs opacity-70 mt-2 block">
-                      {message.timestamp.toLocaleTimeString("pt-BR", {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                    </span>
+                  </motion.div>
+                ))}
+              </AnimatePresence>
+
+              {/* Typing Indicator */}
+              {isLoading && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="flex justify-start"
+                >
+                  <div className="bg-muted rounded-2xl p-4 mr-4">
+                    <div className="flex items-center gap-3">
+                      <div className="p-1.5 rounded-lg bg-primary/10">
+                        <Bot className="h-3.5 w-3.5 text-primary" />
+                      </div>
+                      <div className="flex gap-1">
+                        <motion.div
+                          className="w-2 h-2 rounded-full bg-primary"
+                          animate={{ y: [0, -8, 0] }}
+                          transition={{ repeat: Infinity, duration: 0.6, delay: 0 }}
+                        />
+                        <motion.div
+                          className="w-2 h-2 rounded-full bg-primary"
+                          animate={{ y: [0, -8, 0] }}
+                          transition={{ repeat: Infinity, duration: 0.6, delay: 0.1 }}
+                        />
+                        <motion.div
+                          className="w-2 h-2 rounded-full bg-primary"
+                          animate={{ y: [0, -8, 0] }}
+                          transition={{ repeat: Infinity, duration: 0.6, delay: 0.2 }}
+                        />
+                      </div>
+                      <span className="text-sm text-muted-foreground">Pensando...</span>
+                    </div>
                   </div>
                 </motion.div>
-              ))}
-            </AnimatePresence>
+              )}
+              <div ref={scrollRef} />
+            </div>
+          </ScrollArea>
 
-            {/* Typing Indicator */}
-            {isLoading && (
-              <motion.div
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="flex justify-start"
+          {/* Input Area */}
+          <div className="border-t border-border/50 p-4 bg-background">
+            <div className="flex gap-2">
+              <Input
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSend()}
+                placeholder="Digite sua pergunta... (Enter para enviar)"
+                className="flex-1"
+                disabled={isLoading}
+              />
+              <Button
+                onClick={handleSend}
+                disabled={isLoading || !input.trim()}
+                size="icon"
+                className="h-10 w-10"
               >
-                <div className="bg-muted rounded-2xl p-4 mr-4">
-                  <div className="flex items-center gap-3">
-                    <div className="p-1.5 rounded-lg bg-primary/10">
-                      <Bot className="h-3.5 w-3.5 text-primary" />
-                    </div>
-                    <div className="flex gap-1">
-                      <motion.div
-                        className="w-2 h-2 rounded-full bg-primary"
-                        animate={{ y: [0, -8, 0] }}
-                        transition={{ repeat: Infinity, duration: 0.6, delay: 0 }}
-                      />
-                      <motion.div
-                        className="w-2 h-2 rounded-full bg-primary"
-                        animate={{ y: [0, -8, 0] }}
-                        transition={{ repeat: Infinity, duration: 0.6, delay: 0.1 }}
-                      />
-                      <motion.div
-                        className="w-2 h-2 rounded-full bg-primary"
-                        animate={{ y: [0, -8, 0] }}
-                        transition={{ repeat: Infinity, duration: 0.6, delay: 0.2 }}
-                      />
-                    </div>
-                    <span className="text-sm text-muted-foreground">Pensando...</span>
-                  </div>
-                </div>
-              </motion.div>
-            )}
-            <div ref={scrollRef} />
+                <Send className="h-4 w-4" />
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground mt-2 text-center">
+              💡 Dica: Use Shift+Enter para quebrar linha
+            </p>
           </div>
-        </ScrollArea>
+        </Card>
 
-        {/* Input Area */}
-        <div className="border-t border-border/50 p-4 bg-background">
-          <div className="flex gap-2">
-            <Input
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSend()}
-              placeholder="Digite sua pergunta... (Enter para enviar)"
-              className="flex-1"
-              disabled={isLoading}
-            />
-            <Button
-              onClick={handleSend}
-              disabled={isLoading || !input.trim()}
-              size="icon"
-              className="h-10 w-10"
-            >
-              <Send className="h-4 w-4" />
-            </Button>
-          </div>
-          <p className="text-xs text-muted-foreground mt-2 text-center">
-            💡 Dica: Use Shift+Enter para quebrar linha
-          </p>
+        {/* Suggestions Sidebar - Right Side */}
+        <div className="flex flex-col gap-3 overflow-hidden">
+          <Card className="flex-1 flex flex-col p-3 border-border/50 overflow-hidden">
+            <div className="flex items-center gap-2 mb-3 pb-2 border-b border-border/50">
+              <Sparkles className="h-4 w-4 text-primary" />
+              <h2 className="text-sm font-semibold">Sugestões Rápidas</h2>
+            </div>
+            <Tabs defaultValue="Análise" className="flex-1 flex flex-col overflow-hidden">
+              <TabsList className="grid w-full grid-cols-3 mb-2 h-8 flex-shrink-0">
+                {suggestionCategories.map((category) => (
+                  <TabsTrigger key={category.name} value={category.name} className="text-xs px-2">
+                    <category.icon className="h-3 w-3" />
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+              {suggestionCategories.map((category) => (
+                <TabsContent key={category.name} value={category.name} className="flex-1 mt-0 overflow-hidden">
+                  <ScrollArea className="h-full">
+                    <div className="space-y-2 pr-2">
+                      {category.suggestions.map((suggestion, index) => (
+                        <motion.div
+                          key={index}
+                          initial={{ opacity: 0, x: 20 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: index * 0.05 }}
+                        >
+                          <Card
+                            className="p-2.5 hover:bg-accent hover:border-primary/30 cursor-pointer transition-all duration-200 border-border/50 group"
+                            onClick={() => handleSuggestion(suggestion.text)}
+                          >
+                            <div className="flex items-start gap-2">
+                              <div className="p-1.5 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors mt-0.5 flex-shrink-0">
+                                <suggestion.icon className="h-3 w-3 text-primary" />
+                              </div>
+                              <span className="text-xs font-medium leading-tight flex-1">{suggestion.text}</span>
+                            </div>
+                          </Card>
+                        </motion.div>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                </TabsContent>
+              ))}
+            </Tabs>
+          </Card>
         </div>
-      </Card>
+      </div>
     </div>
   );
 }

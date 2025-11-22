@@ -56,13 +56,13 @@ serve(async (req) => {
         console.log("User authenticated:", user.id);
 
         // 3. Fetch Betting Data (Context)
-        // Fetch recent bets
-        const { data: recentBets, error: betsError } = await supabase
+        // Fetch up to 1000 bets for comprehensive analysis
+        const { data: allBets, error: betsError } = await supabase
             .from("aposta")
             .select("*")
             .eq("user_id", user.id)
             .order("data", { ascending: false })
-            .limit(20);
+            .limit(1000);
 
         if (betsError) {
             console.error("Error fetching bets:", betsError);
@@ -80,13 +80,13 @@ serve(async (req) => {
             throw bookiesError;
         }
 
-        // Calculate basic KPIs from recent bets
-        const totalBets = recentBets?.length || 0;
-        const winningBets = recentBets?.filter((b) => b.resultado === "Ganhou").length || 0;
+        // Calculate comprehensive KPIs from all bets
+        const totalBets = allBets?.length || 0;
+        const winningBets = allBets?.filter((b) => b.resultado === "Ganhou").length || 0;
         const winRate = totalBets > 0 ? ((winningBets / totalBets) * 100).toFixed(1) : "0";
 
         let totalProfit = 0;
-        recentBets?.forEach(bet => {
+        allBets?.forEach(bet => {
             if (bet.resultado === "Ganhou") {
                 totalProfit += (bet.valor_final || 0) - (bet.valor_apostado || 0);
             } else if (bet.resultado === "Perdeu") {
@@ -109,14 +109,14 @@ serve(async (req) => {
         const systemPrompt = `
       Você é o "Wager Art AI", um analista de apostas esportivas profissional e pessoal.
       
-      DADOS DO USUÁRIO (Contexto Real):
-      - Total de Bancas (Saldo): ${bookies?.map(b => `${b.name}: R$${b.balance}`).join(", ")}
-      - Performance Recente (Últimas 20 apostas):
+      DADOS DO USUÁRIO (Contexto Completo):
+      - Total de Bancas (Saldo Atual): ${bookies?.map(b => `${b.name}: R$${b.balance}`).join(", ")}
+      - Performance Geral (${totalBets} apostas no histórico):
         - Taxa de Acerto: ${winRate}%
-        - Lucro/Prejuízo Recente: R$ ${totalProfit.toFixed(2)}
+        - Lucro/Prejuízo Total: R$ ${totalProfit.toFixed(2)}
       
-      HISTÓRICO RECENTE (JSON):
-      ${JSON.stringify(recentBets?.map(b => ({
+      HISTÓRICO COMPLETO (até 1000 apostas mais recentes - JSON):
+      ${JSON.stringify(allBets?.map(b => ({
             data: b.data,
             partida: b.partida,
             aposta: b.tipo_aposta,
@@ -128,12 +128,14 @@ serve(async (req) => {
         })), null, 2)}
 
       SUAS INSTRUÇÕES:
-      1. Analise os dados acima para responder. NÃO invente dados. Se não souber, diga que precisa de mais histórico.
-      2. Seja direto, profissional mas encorajador.
-      3. Se o usuário estiver perdendo muito, sugira gestão de banca e cautela.
-      4. Identifique padrões: "Notei que você ganha mais em Escanteios" ou "Você perde muito apostando em odds altas".
-      5. Responda em Markdown.
-      6. Se o usuário perguntar algo não relacionado a apostas, gentilmente recuse e volte ao foco.
+      1. Você tem acesso a TODO o histórico de apostas do usuário (até 1000 apostas). Use esses dados para análises profundas.
+      2. Analise os dados acima para responder. NÃO invente dados. Se precisar de informações específicas, pergunte ao usuário.
+      3. Seja direto, profissional mas encorajador.
+      4. Identifique padrões ao longo do tempo: tendências, categorias mais lucrativas, horários ideais, etc.
+      5. Se o usuário estiver perdendo muito, sugira gestão de banca e cautela.
+      6. Forneça insights acionáveis baseados em estatísticas reais.
+      7. Responda sempre em Markdown formatado.
+      8. Se o usuário perguntar algo não relacionado a apostas, gentilmente recuse e volte ao foco.
     `;
 
         // 6. Call OpenAI
