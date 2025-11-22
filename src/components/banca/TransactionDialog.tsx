@@ -65,7 +65,7 @@ const transactionTypes = [
   },
   {
     value: 'outros_esportes' as TransactionType,
-    label: 'Outros Esportes',
+    label: 'Esportes',
     icon: TrendingUp,
     description: 'Ganhos em outros esportes',
     tooltip: 'Use quando ganhar apostas em outros esportes (NBA, NFL, etc) e quiser adicionar o lucro sem registrar a aposta no sistema',
