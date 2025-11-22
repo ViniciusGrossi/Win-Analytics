@@ -18,7 +18,7 @@ import { bookiesService } from "@/services/bookies";
 import { apostasService } from "@/services/apostas";
 import type { Bookie, Aposta, ApostaFormData } from "@/types/betting";
 import { formatCurrency, cn } from "@/lib/utils";
-import { CalendarIcon, Wallet, Zap, Gift, Info, Edit, Trash2, AlertTriangle, X, Check } from "lucide-react";
+import { CalendarIcon, Wallet, Zap, Gift, Info, Edit, Trash2, AlertTriangle, X, Check, ChevronsUpDown } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -108,10 +108,14 @@ export function EditApostaDialog({ open, onOpenChange, aposta, onSuccess }: Edit
   const [bookies, setBookies] = useState<Bookie[]>([]);
   const [selectedBookie, setSelectedBookie] = useState<Bookie | null>(null);
   const [categorySearch, setCategorySearch] = useState("");
+  const [tournamentSearch, setTournamentSearch] = useState("");
+  const [bookieSearch, setBookieSearch] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [hasBonus, setHasBonus] = useState(false);
   const [selectedTurbo, setSelectedTurbo] = useState(0);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [bookieOpen, setBookieOpen] = useState(false);
+  const [tournamentOpen, setTournamentOpen] = useState(false);
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -401,35 +405,95 @@ export function EditApostaDialog({ open, onOpenChange, aposta, onSuccess }: Edit
               control={form.control}
               name="casa_de_apostas"
               render={({ field }) => (
-                <FormItem>
+                <FormItem className="flex flex-col">
                   <FormLabel className="flex items-center gap-2">
                     <Wallet className="h-4 w-4" />
                     Casa de Apostas
                   </FormLabel>
-                  <Select
-                    onValueChange={(value) => {
-                      field.onChange(value);
-                      const bookie = bookies.find((b) => b.name === value);
-                      setSelectedBookie(bookie || null);
-                    }}
-                    value={field.value}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione a casa" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {bookies.map((bookie) => (
-                        <SelectItem key={bookie.id} value={bookie.name}>
-                          <div className="flex items-center justify-between w-full">
-                            <span>{bookie.name}</span>
-                            <span className="text-xs text-muted-foreground ml-4">{formatCurrency(bookie.balance || 0)}</span>
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Popover open={bookieOpen} onOpenChange={setBookieOpen}>
+                    <PopoverTrigger asChild>
+                      <FormControl>
+                        <Button
+                          variant="outline"
+                          role="combobox"
+                          className={cn(
+                            "justify-between",
+                            !field.value && "text-muted-foreground"
+                          )}
+                        >
+                          {field.value || "Selecione a casa"}
+                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      </FormControl>
+                    </PopoverTrigger>
+                    <PopoverContent
+                      className="w-[300px] p-0"
+                      onOpenAutoFocus={(e) => e.preventDefault()}
+                    >
+                      <div className="flex flex-col" style={{ maxHeight: '350px', height: '350px' }}>
+                        <div className="p-3 border-b flex-shrink-0 bg-popover">
+                          <Input
+                            placeholder="Buscar casa de apostas..."
+                            value={bookieSearch}
+                            onChange={(e) => setBookieSearch(e.target.value)}
+                            className="h-9"
+                          />
+                        </div>
+                        <div
+                          className="flex-1 p-2"
+                          style={{
+                            overflowY: 'scroll',
+                            WebkitOverflowScrolling: 'touch',
+                            touchAction: 'pan-y',
+                            overscrollBehavior: 'contain',
+                            minHeight: 0
+                          } as React.CSSProperties}
+                          onWheel={(e) => {
+                            e.stopPropagation();
+                          }}
+                        >
+                          {(() => {
+                            const filteredBookies = bookies.filter((bookie) =>
+                              bookie.name.toLowerCase().includes(bookieSearch.toLowerCase())
+                            );
+                            return filteredBookies.length === 0 ? (
+                              <div className="py-6 text-center text-sm text-muted-foreground">
+                                Nenhuma casa encontrada.
+                              </div>
+                            ) : (
+                              <div className="space-y-1">
+                                {filteredBookies.map((bookie) => (
+                                  <div
+                                    key={bookie.id}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      field.onChange(bookie.name);
+                                      setSelectedBookie(bookie);
+                                      setBookieOpen(false);
+                                    }}
+                                    className="flex items-center gap-2 p-2 rounded-sm hover:bg-accent cursor-pointer select-none"
+                                  >
+                                    <Check
+                                      className={cn(
+                                        "h-4 w-4",
+                                        field.value === bookie.name ? "opacity-100" : "opacity-0"
+                                      )}
+                                    />
+                                    <div className="flex items-center justify-between flex-1">
+                                      <span className="text-sm">{bookie.name}</span>
+                                      <span className="text-xs text-muted-foreground ml-4">
+                                        {formatCurrency(bookie.balance || 0)}
+                                      </span>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            );
+                          })()}
+                        </div>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
                   {selectedBookie && (
                     <p className="text-xs text-muted-foreground flex items-center gap-1">
                       <Info className="h-3 w-3" /> Saldo disponível: {formatCurrency(selectedBookie.balance || 0)}
@@ -459,22 +523,86 @@ export function EditApostaDialog({ open, onOpenChange, aposta, onSuccess }: Edit
                 control={form.control}
                 name="torneio"
                 render={({ field }) => (
-                  <FormItem>
+                  <FormItem className="flex flex-col">
                     <FormLabel>Torneio</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione o torneio" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {torneios.map((t) => (
-                          <SelectItem key={t} value={t}>
-                            {t}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <Popover open={tournamentOpen} onOpenChange={setTournamentOpen}>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            variant="outline"
+                            role="combobox"
+                            className={cn(
+                              "justify-between",
+                              !field.value && "text-muted-foreground"
+                            )}
+                          >
+                            {field.value || "Selecione o torneio"}
+                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent
+                        className="w-[300px] p-0"
+                        onOpenAutoFocus={(e) => e.preventDefault()}
+                      >
+                        <div className="flex flex-col" style={{ maxHeight: '350px', height: '350px' }}>
+                          <div className="p-3 border-b flex-shrink-0 bg-popover">
+                            <Input
+                              placeholder="Buscar torneio..."
+                              value={tournamentSearch}
+                              onChange={(e) => setTournamentSearch(e.target.value)}
+                              className="h-9"
+                            />
+                          </div>
+                          <div
+                            className="flex-1 p-2"
+                            style={{
+                              overflowY: 'scroll',
+                              WebkitOverflowScrolling: 'touch',
+                              touchAction: 'pan-y',
+                              overscrollBehavior: 'contain',
+                              minHeight: 0
+                            } as React.CSSProperties}
+                            onWheel={(e) => {
+                              e.stopPropagation();
+                            }}
+                          >
+                            {(() => {
+                              const filteredTournaments = torneios.filter((torneio) =>
+                                torneio.toLowerCase().includes(tournamentSearch.toLowerCase())
+                              );
+                              return filteredTournaments.length === 0 ? (
+                                <div className="py-6 text-center text-sm text-muted-foreground">
+                                  Nenhum torneio encontrado.
+                                </div>
+                              ) : (
+                                <div className="space-y-1">
+                                  {filteredTournaments.map((torneio) => (
+                                    <div
+                                      key={torneio}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        field.onChange(torneio);
+                                        setTournamentOpen(false);
+                                      }}
+                                      className="flex items-center gap-2 p-2 rounded-sm hover:bg-accent cursor-pointer select-none"
+                                    >
+                                      <Check
+                                        className={cn(
+                                          "h-4 w-4",
+                                          field.value === torneio ? "opacity-100" : "opacity-0"
+                                        )}
+                                      />
+                                      <span className="text-sm">{torneio}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              );
+                            })()}
+                          </div>
+                        </div>
+                      </PopoverContent>
+                    </Popover>
                     <FormMessage />
                   </FormItem>
                 )}
