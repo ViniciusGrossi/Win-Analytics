@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Bot, Send, Sparkles, TrendingUp, Target, AlertCircle } from "lucide-react";
 import { motion } from "framer-motion";
+import { supabase } from "@/integrations/supabase/client";
 
 interface Message {
   id: string;
@@ -46,17 +47,32 @@ export default function Assistente() {
     setInput("");
     setIsLoading(true);
 
-    // Simular resposta da IA (substituir com chamada real depois)
-    setTimeout(() => {
+    try {
+      const { data, error } = await supabase.functions.invoke('ai-assistant', {
+        body: { message: userMessage.content },
+      });
+
+      if (error) throw error;
+
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
-        content: "Esta é uma resposta simulada. A integração com IA será implementada em breve para fornecer análises personalizadas baseadas em seus dados.",
+        content: data.reply || "Desculpe, não consegui processar sua resposta.",
         timestamp: new Date(),
       };
       setMessages((prev) => [...prev, assistantMessage]);
+    } catch (error) {
+      console.error("Erro ao chamar IA:", error);
+      const errorMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: "assistant",
+        content: "Ocorreu um erro ao processar sua solicitação. Verifique se a chave da API está configurada.",
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, errorMessage]);
+    } finally {
       setIsLoading(false);
-    }, 1000);
+    }
   };
 
   const handleSuggestion = (text: string) => {
@@ -112,11 +128,10 @@ export default function Assistente() {
                 className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
               >
                 <div
-                  className={`max-w-[80%] rounded-2xl p-4 ${
-                    message.role === "user"
-                      ? "bg-primary text-primary-foreground ml-4"
-                      : "bg-muted mr-4"
-                  }`}
+                  className={`max-w-[80%] rounded-2xl p-4 ${message.role === "user"
+                    ? "bg-primary text-primary-foreground ml-4"
+                    : "bg-muted mr-4"
+                    }`}
                 >
                   {message.role === "assistant" && (
                     <div className="flex items-center gap-2 mb-2">
@@ -124,7 +139,17 @@ export default function Assistente() {
                       <span className="text-xs font-medium text-primary">Assistente</span>
                     </div>
                   )}
-                  <p className="text-sm leading-relaxed">{message.content}</p>
+                  <div className="text-sm leading-relaxed whitespace-pre-wrap">
+                    {message.content.split('\n').map((line, i) => (
+                      <p key={i} className="min-h-[1.2em]">
+                        {line.split(/(\*\*.*?\*\*)/).map((part, j) =>
+                          part.startsWith('**') && part.endsWith('**')
+                            ? <strong key={j}>{part.slice(2, -2)}</strong>
+                            : part
+                        )}
+                      </p>
+                    ))}
+                  </div>
                   <span className="text-xs opacity-70 mt-2 block">
                     {message.timestamp.toLocaleTimeString("pt-BR", {
                       hour: "2-digit",
