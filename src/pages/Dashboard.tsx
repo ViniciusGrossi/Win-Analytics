@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { TrendingUp, DollarSign, Target, TrendingDown, ClipboardList, Clock } from "lucide-react";
+import { TrendingUp, DollarSign, Target, TrendingDown, ClipboardList, Clock, Calendar as CalendarIcon } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { KPICard } from "@/components/dashboard/KPICard";
 import { LucroChart } from "@/components/dashboard/LucroChart";
@@ -9,13 +9,19 @@ import { apostasService } from "@/services/apostas";
 import { useFilterStore } from "@/store/useFilterStore";
 import { formatCurrency, formatPercentage } from "@/lib/utils";
 import type { KPIData, SeriesData } from "@/types/betting";
+import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { cn } from "@/lib/utils";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 
 export default function Dashboard() {
   const [kpis, setKpis] = useState<KPIData | null>(null);
   const [series, setSeries] = useState<SeriesData[]>([]);
   const [distribution, setDistribution] = useState<{ name: string; value: number }[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const { startDate, endDate, casa, tipo } = useFilterStore();
+  const { startDate, endDate, casa, tipo, setStartDate, setEndDate, resetFilters } = useFilterStore();
 
   useEffect(() => {
     loadData();
@@ -50,27 +56,68 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 px-2 sm:px-4">
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="flex items-center justify-between"
+        className="flex items-center justify-between flex-col sm:flex-row gap-3"
       >
         <div>
-          <h1 className="text-4xl font-bold tracking-tight">Dashboard</h1>
+          <h1 className="text-2xl sm:text-4xl font-bold tracking-tight">Dashboard</h1>
           <p className="text-muted-foreground mt-1">Visão geral do seu desempenho</p>
         </div>
       </motion.div>
 
-      <Tabs defaultValue="geral" className="space-y-6">
-        <TabsList>
-          <TabsTrigger value="geral">Geral</TabsTrigger>
-          <TabsTrigger value="casa">Por Casa</TabsTrigger>
-          <TabsTrigger value="tipo">Por Tipo</TabsTrigger>
-        </TabsList>
+      <div className="space-y-4">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+          <div className="flex items-center gap-2">
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className={cn("w-full sm:w-[240px] justify-start", !startDate && "text-muted-foreground")}
+                >
+                  {startDate ? format(new Date(startDate), "PPP", { locale: ptBR }) : "Data inicial"}
+                  <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={startDate ? new Date(startDate) : undefined}
+                  onSelect={(d) => d && setStartDate(format(d, "yyyy-MM-dd"))}
+                  initialFocus
+                  className={cn("p-3 pointer-events-auto")}
+                />
+              </PopoverContent>
+            </Popover>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className={cn("w-full sm:w-[240px] justify-start", !endDate && "text-muted-foreground")}
+                >
+                  {endDate ? format(new Date(endDate), "PPP", { locale: ptBR }) : "Data final"}
+                  <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={endDate ? new Date(endDate) : undefined}
+                  onSelect={(d) => d && setEndDate(format(d, "yyyy-MM-dd"))}
+                  initialFocus
+                  className={cn("p-3 pointer-events-auto")}
+                />
+              </PopoverContent>
+            </Popover>
+          </div>
+          <Button variant="ghost" onClick={resetFilters}>Limpar</Button>
+        </div>
+
+        <Tabs defaultValue="geral" className="space-y-6">
+          <TabsList>
+            <TabsTrigger value="geral">Geral</TabsTrigger>
+          </TabsList>
 
         <TabsContent value="geral" className="space-y-6">
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-3 sm:gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
             <KPICard
               title="Total Apostado"
               value={kpis ? formatCurrency(kpis.totalApostado) : "-"}
@@ -115,24 +162,13 @@ export default function Dashboard() {
             />
           </div>
 
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-3 sm:gap-4 grid-cols-1 md:grid-cols-2">
             <LucroChart data={series} isLoading={isLoading} />
             <DistributionChart data={distribution} isLoading={isLoading} />
           </div>
         </TabsContent>
-
-        <TabsContent value="casa">
-          <div className="text-center py-12 text-muted-foreground">
-            Visualização por casa em desenvolvimento...
-          </div>
-        </TabsContent>
-
-        <TabsContent value="tipo">
-          <div className="text-center py-12 text-muted-foreground">
-            Visualização por tipo em desenvolvimento...
-          </div>
-        </TabsContent>
-      </Tabs>
+        </Tabs>
+      </div>
     </div>
   );
 }

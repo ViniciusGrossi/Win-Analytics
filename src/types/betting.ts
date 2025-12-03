@@ -62,7 +62,7 @@ export interface DistributionData {
 
 export type ResultadoType = 'Ganhou' | 'Perdeu' | 'Cancelado' | 'Cashout' | 'Pendente';
 
-export type TransactionType = 'deposit' | 'withdraw';
+export type TransactionType = 'deposit' | 'withdraw' | 'recarga' | 'saque' | 'transferencia' | 'bonus' | 'ajuste' | 'outros_esportes';
 
 export interface Transaction {
   id: number;

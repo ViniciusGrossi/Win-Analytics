@@ -28,6 +28,7 @@ export type Database = {
           tipo_aposta: string | null
           torneio: string | null
           turbo: number | null
+          user_id: string | null
           valor_apostado: number | null
           valor_final: number | null
         }
@@ -44,6 +45,7 @@ export type Database = {
           tipo_aposta?: string | null
           torneio?: string | null
           turbo?: number | null
+          user_id?: string | null
           valor_apostado?: number | null
           valor_final?: number | null
         }
@@ -60,10 +62,19 @@ export type Database = {
           tipo_aposta?: string | null
           torneio?: string | null
           turbo?: number | null
+          user_id?: string | null
           valor_apostado?: number | null
           valor_final?: number | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "aposta_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       bookies: {
         Row: {
@@ -74,6 +85,7 @@ export type Database = {
           last_update: string | null
           last_withdraw: string | null
           name: string
+          user_id: string | null
         }
         Insert: {
           balance?: number | null
@@ -83,6 +95,7 @@ export type Database = {
           last_update?: string | null
           last_withdraw?: string | null
           name: string
+          user_id?: string | null
         }
         Update: {
           balance?: number | null
@@ -92,8 +105,17 @@ export type Database = {
           last_update?: string | null
           last_withdraw?: string | null
           name?: string
+          user_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "bookies_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       cmd_exec: {
         Row: {
@@ -137,6 +159,7 @@ export type Database = {
           monthly_goal: number | null
           result: boolean | null
           updated_at: string | null
+          user_id: string | null
         }
         Insert: {
           created_at?: string | null
@@ -146,6 +169,7 @@ export type Database = {
           monthly_goal?: number | null
           result?: boolean | null
           updated_at?: string | null
+          user_id?: string | null
         }
         Update: {
           created_at?: string | null
@@ -154,6 +178,36 @@ export type Database = {
           loss_limit?: number | null
           monthly_goal?: number | null
           result?: boolean | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "goals_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          created_at: string | null
+          email: string | null
+          id: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          email?: string | null
+          id: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          email?: string | null
+          id?: string
           updated_at?: string | null
         }
         Relationships: []
@@ -166,6 +220,7 @@ export type Database = {
           description: string | null
           id: number
           type: string
+          user_id: string | null
         }
         Insert: {
           amount: number
@@ -174,6 +229,7 @@ export type Database = {
           description?: string | null
           id?: number
           type: string
+          user_id?: string | null
         }
         Update: {
           amount?: number
@@ -182,6 +238,7 @@ export type Database = {
           description?: string | null
           id?: number
           type?: string
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -191,6 +248,39 @@ export type Database = {
             referencedRelation: "bookies"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "transactions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_roles: {
+        Row: {
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_roles_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
         ]
       }
     }
@@ -198,6 +288,13 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
       match_documents: {
         Args: { filter?: Json; match_count?: number; query_embedding: string }
         Returns: {
@@ -209,7 +306,7 @@ export type Database = {
       }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "user"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -336,6 +433,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "user"],
+    },
   },
 } as const

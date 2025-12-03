@@ -3,9 +3,11 @@ import { Button } from "@/components/ui/button";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { useTheme } from "next-themes";
 import { motion } from "framer-motion";
+import { useAuth } from "@/hooks/useAuth";
 
 export function Topbar() {
   const { theme, setTheme } = useTheme();
+  const { user } = useAuth();
 
   return (
     <motion.header
@@ -15,6 +17,11 @@ export function Topbar() {
     >
       <SidebarTrigger />
       <div className="flex-1" />
+      {user && (
+        <span className="text-sm text-muted-foreground hidden sm:inline">
+          {user.email}
+        </span>
+      )}
       <Button
         variant="ghost"
         size="icon"

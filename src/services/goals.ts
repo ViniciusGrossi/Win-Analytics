@@ -3,9 +3,13 @@ import type { Goal } from "@/types/betting";
 
 export const goalsService = {
   async get() {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Usuário não autenticado");
+
     const { data, error } = await supabase
       .from("goals")
       .select("*")
+      .eq("user_id", user.id)
       .order("id", { ascending: false })
       .limit(1)
       .maybeSingle();
@@ -15,6 +19,9 @@ export const goalsService = {
   },
 
   async upsert(goal: Partial<Goal>) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Usuário não autenticado");
+
     const existing = await this.get();
     
     if (existing) {
@@ -39,6 +46,7 @@ export const goalsService = {
           daily_goal: goal.daily_goal || 100,
           monthly_goal: goal.monthly_goal || 2000,
           loss_limit: goal.loss_limit || 200,
+          user_id: user.id,
         })
         .select()
         .single();

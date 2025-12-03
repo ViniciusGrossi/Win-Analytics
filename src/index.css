@@ -10,46 +10,46 @@ All colors MUST be HSL.
   :root {
     --background: 0 0% 100%;
     --foreground: 240 10% 3.9%;
-    
+
     --card: 0 0% 100%;
     --card-foreground: 240 10% 3.9%;
-    
+
     --popover: 0 0% 100%;
     --popover-foreground: 240 10% 3.9%;
-    
+
     --primary: 142.1 76.2% 36.3%;
     --primary-foreground: 355.7 100% 97.3%;
-    
+
     --secondary: 240 4.8% 95.9%;
     --secondary-foreground: 240 5.9% 10%;
-    
+
     --muted: 240 4.8% 95.9%;
     --muted-foreground: 240 3.8% 46.1%;
-    
+
     --accent: 142.1 76.2% 36.3%;
     --accent-foreground: 355.7 100% 97.3%;
-    
+
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 98%;
-    
+
     --success: 142.1 76.2% 36.3%;
     --success-foreground: 355.7 100% 97.3%;
-    
+
     --warning: 38 92% 50%;
     --warning-foreground: 48 96% 89%;
-    
+
     --border: 240 5.9% 90%;
     --input: 240 5.9% 90%;
     --ring: 142.1 76.2% 36.3%;
-    
+
     --radius: 0.75rem;
-    
+
     --chart-1: 142.1 76.2% 36.3%;
     --chart-2: 160 60% 45%;
     --chart-3: 173 58% 39%;
     --chart-4: 197 37% 24%;
     --chart-5: 220 70% 50%;
-    
+
     --sidebar-background: 0 0% 98%;
     --sidebar-foreground: 240 5.3% 26.1%;
     --sidebar-primary: 240 5.9% 10%;
@@ -59,48 +59,48 @@ All colors MUST be HSL.
     --sidebar-border: 220 13% 91%;
     --sidebar-ring: 217.2 91.2% 59.8%;
   }
-  
+
   .dark {
     --background: 240 10% 3.9%;
     --foreground: 0 0% 98%;
-    
+
     --card: 240 10% 8%;
     --card-foreground: 0 0% 98%;
-    
+
     --popover: 240 10% 8%;
     --popover-foreground: 0 0% 98%;
-    
+
     --primary: 142.1 70.6% 45.3%;
     --primary-foreground: 144.9 80.4% 10%;
-    
+
     --secondary: 240 3.7% 15.9%;
     --secondary-foreground: 0 0% 98%;
-    
+
     --muted: 240 3.7% 15.9%;
     --muted-foreground: 240 5% 64.9%;
-    
+
     --accent: 142.1 70.6% 45.3%;
     --accent-foreground: 144.9 80.4% 10%;
-    
+
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 0 0% 98%;
-    
+
     --success: 142.1 70.6% 45.3%;
     --success-foreground: 144.9 80.4% 10%;
-    
+
     --warning: 38 92% 50%;
     --warning-foreground: 48 96% 89%;
-    
+
     --border: 240 3.7% 15.9%;
     --input: 240 3.7% 15.9%;
     --ring: 142.4 71.8% 29.2%;
-    
+
     --chart-1: 142.1 70.6% 45.3%;
     --chart-2: 160 60% 45%;
     --chart-3: 173 58% 39%;
     --chart-4: 197 37% 24%;
     --chart-5: 220 70% 50%;
-    
+
     --sidebar-background: 240 5.9% 10%;
     --sidebar-foreground: 240 4.8% 95.9%;
     --sidebar-primary: 224.3 76.3% 48%;
@@ -126,36 +126,90 @@ All colors MUST be HSL.
   .glass-effect {
     @apply bg-background/80 backdrop-blur-md border border-border/50;
   }
-  
+
   .hover-lift {
     @apply transition-all duration-200 hover:-translate-y-1 hover:shadow-lg;
   }
-  
+
   .animate-fade-in {
     animation: fade-in 0.3s ease-out;
   }
-  
+
   @keyframes fade-in {
     from {
       opacity: 0;
       transform: translateY(10px);
     }
+
     to {
       opacity: 1;
       transform: translateY(0);
     }
   }
-  
+
   .animate-slide-in {
     animation: slide-in 0.3s ease-out;
   }
-  
+
   @keyframes slide-in {
     from {
       transform: translateX(-100%);
     }
+
     to {
       transform: translateX(0);
     }
   }
+}
+
+/* Forçar scroll em componentes CMDK */
+[cmdk-list] {
+  overflow-y: auto !important;
+  -webkit-overflow-scrolling: touch !important;
+  touch-action: pan-y !important;
+  overscroll-behavior: contain !important;
+  pointer-events: auto !important;
+}
+
+[cmdk-group] {
+  pointer-events: auto !important;
+}
+
+[cmdk-item] {
+  pointer-events: auto !important;
+}
+
+/* Forçar scroll em Popovers do Radix UI */
+[data-radix-popper-content-wrapper] {
+  pointer-events: auto !important;
+}
+
+/* Garantir que divs com overflow dentro de popovers funcionem */
+[data-radix-popper-content-wrapper] div[style*="overflow"] {
+  pointer-events: auto !important;
+  -webkit-overflow-scrolling: touch !important;
+  overscroll-behavior: contain !important;
+}
+
+/* Forçar scroll visível */
+[data-radix-popper-content-wrapper] div[style*="overflowY"] {
+  scrollbar-width: thin;
+}
+
+[data-radix-popper-content-wrapper] div[style*="overflowY"]::-webkit-scrollbar {
+  width: 8px;
+}
+
+[data-radix-popper-content-wrapper] div[style*="overflowY"]::-webkit-scrollbar-track {
+  background: hsl(var(--muted));
+  border-radius: 4px;
+}
+
+[data-radix-popper-content-wrapper] div[style*="overflowY"]::-webkit-scrollbar-thumb {
+  background: hsl(var(--muted-foreground) / 0.5);
+  border-radius: 4px;
+}
+
+[data-radix-popper-content-wrapper] div[style*="overflowY"]::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground) / 0.7);
 }

@@ -1,5 +1,10 @@
-import { Home, ClipboardList, CheckCircle2, BarChart3, Wallet } from "lucide-react";
+import { Home, ClipboardList, CheckCircle2, BarChart3, Wallet, Bot, Settings, LogOut, Download } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
+import { Button } from "@/components/ui/button";
+import { usePWA } from "@/hooks/usePWA";
+import { useAuth } from "@/hooks/useAuth";
+import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 import {
   Sidebar,
   SidebarContent,
@@ -17,9 +22,33 @@ const menuItems = [
   { title: "Resultados", url: "/resultados", icon: CheckCircle2 },
   { title: "Análises", url: "/analises", icon: BarChart3 },
   { title: "Banca", url: "/banca", icon: Wallet },
+  { title: "Assistente IA", url: "/assistente", icon: Bot },
 ];
 
 export function AppSidebar() {
+  const { isInstallable, installPWA } = usePWA();
+  const { signOut } = useAuth();
+  const navigate = useNavigate();
+
+  const handleInstallClick = async () => {
+    if (!isInstallable) {
+      toast.info("O app já está instalado ou não está disponível para instalação neste navegador.");
+      return;
+    }
+    await installPWA();
+    toast.success("App instalado com sucesso!");
+  };
+
+  const handleSignOut = async () => {
+    const { error } = await signOut();
+    if (error) {
+      toast.error("Erro ao sair");
+    } else {
+      toast.success("Logout realizado com sucesso!");
+      navigate("/auth");
+    }
+  };
+
   return (
     <Sidebar className="border-r">
       <SidebarContent>
@@ -48,6 +77,36 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
+      
+      <div className="mt-auto border-t border-border p-4 space-y-2">
+        <Button 
+          onClick={handleInstallClick}
+          variant="default" 
+          className="w-full justify-start gap-3" 
+          size="sm"
+        >
+          <Download className="h-4 w-4" />
+          <span className="text-sm">Instalar App</span>
+        </Button>
+        <Button 
+          onClick={() => navigate("/configuracoes")}
+          variant="ghost" 
+          className="w-full justify-start gap-3" 
+          size="sm"
+        >
+          <Settings className="h-4 w-4" />
+          <span className="text-sm">Configurações</span>
+        </Button>
+        <Button 
+          onClick={handleSignOut}
+          variant="ghost" 
+          className="w-full justify-start gap-3 text-destructive hover:text-destructive hover:bg-destructive/10" 
+          size="sm"
+        >
+          <LogOut className="h-4 w-4" />
+          <span className="text-sm">Sair</span>
+        </Button>
+      </div>
     </Sidebar>
   );
 }

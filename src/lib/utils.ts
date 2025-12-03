@@ -1,5 +1,6 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
+import dayjs from "dayjs";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -17,5 +18,11 @@ export function formatPercentage(value: number): string {
 }
 
 export function formatDate(date: string): string {
-  return new Intl.DateTimeFormat("pt-BR").format(new Date(date));
+  return dayjs(date).format("DD/MM/YYYY");
+}
+
+export function normalizeTurbo(turbo: number | null | undefined): number {
+  if (!turbo) return 0;
+  // Se for maior que 1, assumir que é porcentagem inteira (25, 50, etc) e converter para decimal
+  return turbo > 1 ? turbo / 100 : turbo;
 }

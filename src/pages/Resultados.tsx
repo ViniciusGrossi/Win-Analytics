@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import type { Aposta, ResultadoType } from "@/types/betting";
-import { toast } from "sonner";
+import { toast } from "@/hooks/use-toast";
 import { Search, SlidersHorizontal, X } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 
@@ -31,7 +31,7 @@ export default function Resultados() {
       setApostas(data);
     } catch (error) {
       console.error("Erro ao carregar apostas:", error);
-      toast.error("Erro ao carregar apostas");
+      toast({ title: "Erro", description: "Erro ao carregar apostas", variant: "destructive" });
     } finally {
       setIsLoading(false);
     }
@@ -98,11 +98,11 @@ export default function Resultados() {
 
       await apostasService.setResult(id, resultado, aposta, cashoutValue);
       
-      toast.success(`Resultado marcado como ${resultado}`);
+      toast({ title: "Sucesso", description: `Resultado marcado como ${resultado}` });
       await loadApostas();
     } catch (error) {
       console.error("Erro ao definir resultado:", error);
-      toast.error("Erro ao definir resultado");
+      toast({ title: "Erro", description: "Erro ao definir resultado", variant: "destructive" });
     }
   };
 
@@ -127,14 +127,14 @@ export default function Resultados() {
   }, [apostasPendentes]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 px-2 sm:px-4">
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="flex items-center justify-between mb-6"
+        className="flex items-center justify-between mb-6 flex-col sm:flex-row gap-3"
       >
         <div>
-          <h1 className="text-4xl font-bold tracking-tight">Resultados</h1>
+          <h1 className="text-2xl sm:text-4xl font-bold tracking-tight">Resultados</h1>
           <p className="text-muted-foreground mt-1">Confirme os resultados das apostas pendentes</p>
         </div>
       </motion.div>
@@ -148,7 +148,7 @@ export default function Resultados() {
         transition={{ delay: 0.2 }}
       >
         <Card className="p-4 glass-effect">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
             <div>
               <p className="text-xs text-muted-foreground mb-1">Apostas Pendentes</p>
               <p className="text-2xl font-bold text-primary">{pendenteStats.quantidade}</p>
@@ -182,7 +182,7 @@ export default function Resultados() {
             <h3 className="font-semibold">Filtros e Busca</h3>
           </div>
           
-          <div className="grid md:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
@@ -261,13 +261,13 @@ export default function Resultados() {
         </div>
 
         {isLoading ? (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-3 sm:gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
             {[...Array(6)].map((_, i) => (
               <div key={i} className="h-64 bg-muted/50 animate-pulse rounded-xl" />
             ))}
           </div>
         ) : apostasPendentes.length > 0 ? (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-3 sm:gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
             {apostasPendentes.map((aposta, index) => (
               <motion.div
                 key={aposta.id}

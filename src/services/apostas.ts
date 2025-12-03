@@ -15,9 +15,13 @@ export interface ListParams {
 
 export const apostasService = {
   async list(params: ListParams = {}) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Usuário não autenticado");
+
     let query = supabase
       .from("aposta")
       .select("*", { count: "exact" })
+      .eq("user_id", user.id)
       .order("data", { ascending: false });
 
     if (params.startDate) {
@@ -50,9 +54,12 @@ export const apostasService = {
     return { data: data as Aposta[], count: count || 0 };
   },
 
-  async create(dto: ApostaFormData, bookieBalance: number) {
-    // Validar saldo se não for bônus
-    if (!dto.bonus && bookieBalance < dto.valor_apostado) {
+  async create(dto: ApostaFormData, bookieBalance: number, hasBonus: boolean = false) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Usuário não autenticado");
+
+    // Apenas validar saldo do valor apostado (não bônus)
+    if (bookieBalance < dto.valor_apostado) {
       throw new Error("Saldo insuficiente na casa de apostas");
     }
 
@@ -61,6 +68,7 @@ export const apostasService = {
       .from("aposta")
       .insert({
         ...dto,
+        user_id: user.id,
         resultado: "Pendente",
         valor_final: 0,
       })
@@ -69,18 +77,16 @@ export const apostasService = {
 
     if (apostaError) throw apostaError;
 
-    // Debitar saldo se não for bônus
-    if (!dto.bonus) {
-      const { error: balanceError } = await supabase
-        .from("bookies")
-        .update({ 
-          balance: bookieBalance - dto.valor_apostado,
-          last_update: new Date().toISOString()
-        })
-        .eq("name", dto.casa_de_apostas);
+    // Descontar apenas o valor apostado (não o bônus) da casa de apostas
+    const { error: balanceError } = await supabase
+      .from("bookies")
+      .update({ 
+        balance: bookieBalance - dto.valor_apostado,
+        last_update: new Date().toISOString()
+      })
+      .eq("name", dto.casa_de_apostas);
 
-      if (balanceError) throw balanceError;
-    }
+    if (balanceError) throw balanceError;
 
     return aposta as Aposta;
   },
@@ -95,16 +101,34 @@ export const apostasService = {
     let updateBalance = 0;
 
     if (resultado === "Ganhou") {
-      const lucro = (apostaData.valor_apostado || 0) * ((apostaData.odd || 1) - 1);
-      valor_final = lucro;
-      updateBalance = apostaData.bonus ? lucro : (apostaData.valor_apostado || 0) + lucro;
+      // Lucro do valor apostado normal
+      const lucroBase = (apostaData.valor_apostado || 0) * ((apostaData.odd || 1) - 1);
+      
+      // Lucro do bônus (apenas o lucro, não retorna o valor do bônus)
+      const lucroBonus = (apostaData.bonus || 0) * ((apostaData.odd || 1) - 1);
+      
+      // Lucro total sem turbo
+      const lucroSemTurbo = lucroBase + lucroBonus;
+      
+      // Turbo multiplica o lucro total (ex: 25% turbo = lucro * 1.25)
+      const turboRaw = apostaData.turbo || 0;
+      const turbo = turboRaw > 1 ? turboRaw / 100 : turboRaw;
+      const lucroTotal = turbo > 0 ? lucroSemTurbo * (1 + turbo) : lucroSemTurbo;
+      
+      valor_final = lucroTotal;
+      
+      // Retornar à banca: valor apostado + lucro total com turbo
+      updateBalance = (apostaData.valor_apostado || 0) + lucroTotal;
     } else if (resultado === "Perdeu") {
-      valor_final = apostaData.bonus ? 0 : -(apostaData.valor_apostado || 0);
+      // Perde apenas o valor apostado, bônus já não estava na banca
+      valor_final = -(apostaData.valor_apostado || 0);
       updateBalance = 0;
     } else if (resultado === "Cancelado") {
       valor_final = 0;
-      updateBalance = apostaData.bonus ? 0 : (apostaData.valor_apostado || 0);
+      // Retorna apenas o valor apostado (bônus não estava na banca)
+      updateBalance = (apostaData.valor_apostado || 0);
     } else if (resultado === "Cashout" && cashoutValue) {
+      // No cashout, considerar que o valor do cashout já inclui tudo
       valor_final = cashoutValue - (apostaData.valor_apostado || 0);
       updateBalance = cashoutValue;
     }

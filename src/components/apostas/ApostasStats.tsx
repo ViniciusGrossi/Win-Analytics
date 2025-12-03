@@ -66,7 +66,7 @@ export function ApostasStats({ apostas }: ApostasStatsProps) {
   ];
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+    <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3">
       {statCards.map((stat) => (
         <motion.div
           key={stat.label}
@@ -75,14 +75,14 @@ export function ApostasStats({ apostas }: ApostasStatsProps) {
           transition={{ delay: stat.delay }}
         >
           <Card className="glass-effect">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between mb-2">
-                <stat.icon className={`h-4 w-4 ${stat.color}`} />
-                <span className={`text-2xl font-bold ${stat.color}`}>
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex items-center justify-between mb-1 sm:mb-2">
+                <stat.icon className={`h-3 w-3 sm:h-4 sm:w-4 ${stat.color}`} />
+                <span className={`text-lg sm:text-2xl font-bold ${stat.color}`}>
                   {stat.value}
                 </span>
               </div>
-              <p className="text-xs text-muted-foreground">{stat.label}</p>
+              <p className="text-[10px] sm:text-xs text-muted-foreground">{stat.label}</p>
             </CardContent>
           </Card>
         </motion.div>

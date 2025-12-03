@@ -1,13 +1,14 @@
 import { useState, useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
+import { Plus, RefreshCw } from "lucide-react";
 import { apostasService } from "@/services/apostas";
 import { ApostasTable } from "@/components/apostas/ApostasTable";
 import { CreateApostaDialog } from "@/components/apostas/CreateApostaDialog";
 import { ApostasFilters } from "@/components/apostas/ApostasFilters";
 import { ApostasStats } from "@/components/apostas/ApostasStats";
 import type { Aposta, ResultadoType } from "@/types/betting";
+import { startOfDay, endOfDay, subDays, isWithinInterval, parseISO } from "date-fns";
 
 export default function Apostas() {
   const [apostas, setApostas] = useState<Aposta[]>([]);
@@ -15,6 +16,10 @@ export default function Apostas() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedStatus, setSelectedStatus] = useState<ResultadoType | "Todos">("Todos");
   const [selectedCasa, setSelectedCasa] = useState<string>("Todas");
+  const [selectedPeriod, setSelectedPeriod] = useState<string>("all");
+  const [selectedCategory, setSelectedCategory] = useState<string>("Todas");
+  const [selectedTorneio, setSelectedTorneio] = useState<string>("Todos");
+  const [dateRange, setDateRange] = useState<{ from?: Date; to?: Date }>({});
 
   useEffect(() => {
     loadApostas();
@@ -37,32 +42,99 @@ export default function Apostas() {
     return Array.from(casas) as string[];
   }, [apostas]);
 
+  const categoriesAvailable = useMemo(() => {
+    const categories = new Set<string>();
+    apostas.forEach((a) => {
+      if (a.categoria) {
+        // Split por vírgula caso tenha múltiplas categorias
+        a.categoria.split(',').forEach(cat => {
+          categories.add(cat.trim());
+        });
+      }
+    });
+    return Array.from(categories).sort();
+  }, [apostas]);
+
+  const torneiosAvailable = useMemo(() => {
+    const torneios = new Set(apostas.map((a) => a.torneio).filter(Boolean));
+    return Array.from(torneios).sort() as string[];
+  }, [apostas]);
+
+  const getDateRangeForPeriod = (period: string): { from?: Date; to?: Date } => {
+    const now = new Date();
+    switch (period) {
+      case "today":
+        return { from: startOfDay(now), to: endOfDay(now) };
+      case "last7":
+        return { from: startOfDay(subDays(now, 7)), to: endOfDay(now) };
+      case "last30":
+        return { from: startOfDay(subDays(now, 30)), to: endOfDay(now) };
+      case "custom":
+        return dateRange;
+      default:
+        return {};
+    }
+  };
+
   const apostasFiltradas = useMemo(() => {
     return apostas.filter((aposta) => {
+      // Status filter
       const matchStatus = selectedStatus === "Todos" || aposta.resultado === selectedStatus;
+
+      // Casa filter
       const matchCasa = selectedCasa === "Todas" || aposta.casa_de_apostas === selectedCasa;
-      return matchStatus && matchCasa;
+
+      // Category filter
+      const matchCategory = selectedCategory === "Todas" ||
+        (aposta.categoria && aposta.categoria.split(',').map(c => c.trim()).includes(selectedCategory));
+
+      // Torneio filter
+      const matchTorneio = selectedTorneio === "Todos" || aposta.torneio === selectedTorneio;
+
+      // Date filter
+      let matchDate = true;
+      if (selectedPeriod !== "all") {
+        const range = getDateRangeForPeriod(selectedPeriod);
+        if (range.from && range.to && aposta.data) {
+          try {
+            const apostaDate = parseISO(aposta.data);
+            matchDate = isWithinInterval(apostaDate, { start: range.from, end: range.to });
+          } catch (error) {
+            matchDate = true; // Se houver erro no parse, não filtra
+          }
+        } else if (selectedPeriod === "custom" && !range.from && !range.to) {
+          matchDate = true; // Se custom mas sem datas, mostra tudo
+        }
+      }
+
+      return matchStatus && matchCasa && matchCategory && matchTorneio && matchDate;
     });
-  }, [apostas, selectedStatus, selectedCasa]);
+  }, [apostas, selectedStatus, selectedCasa, selectedPeriod, selectedCategory, selectedTorneio, dateRange]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 px-2 sm:px-4">
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="flex items-center justify-between flex-wrap gap-4"
+        className="flex items-center justify-between flex-col sm:flex-row gap-3"
       >
         <div>
-          <h1 className="text-4xl font-bold tracking-tight">Apostas</h1>
-          <p className="text-muted-foreground mt-1">Gerencie todas as suas apostas</p>
+          <h1 className="text-2xl sm:text-4xl font-bold tracking-tight">Apostas</h1>
+          <p className="text-muted-foreground mt-1 text-sm sm:text-base">Gerencie todas as suas apostas</p>
         </div>
-        <Button onClick={() => setDialogOpen(true)} size="lg" className="gap-2">
-          <Plus className="h-5 w-5" />
-          Nova Aposta
-        </Button>
+        <div className="flex gap-2 w-full sm:w-auto">
+          <Button onClick={loadApostas} size="default" variant="outline" className="gap-2 flex-1 sm:flex-initial">
+            <RefreshCw className="h-4 w-4" />
+            <span className="hidden sm:inline">Atualizar</span>
+          </Button>
+          <Button onClick={() => setDialogOpen(true)} size="default" className="gap-2 flex-1 sm:flex-initial">
+            <Plus className="h-4 w-4" />
+            Nova Aposta
+          </Button>
+        </div>
       </motion.div>
 
-      <ApostasStats apostas={apostas} />
+      <ApostasStats apostas={apostasFiltradas} />
 
       <div className="space-y-4">
         <ApostasFilters
@@ -71,9 +143,19 @@ export default function Apostas() {
           selectedCasa={selectedCasa}
           onCasaChange={setSelectedCasa}
           casasDisponiveis={casasDisponiveis}
+          selectedPeriod={selectedPeriod}
+          onPeriodChange={setSelectedPeriod}
+          selectedCategory={selectedCategory}
+          onCategoryChange={setSelectedCategory}
+          categoriesAvailable={categoriesAvailable}
+          selectedTorneio={selectedTorneio}
+          onTorneioChange={setSelectedTorneio}
+          torneiosAvailable={torneiosAvailable}
+          dateRange={dateRange}
+          onDateRangeChange={setDateRange}
         />
 
-  <ApostasTable data={apostasFiltradas} isLoading={isLoading} onReload={loadApostas} />
+        <ApostasTable data={apostasFiltradas} isLoading={isLoading} onReload={loadApostas} />
       </div>
 
       <CreateApostaDialog
