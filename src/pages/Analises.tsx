@@ -321,6 +321,21 @@ export default function Analises() {
     }));
   })();
 
+  const riskRadarData = [
+    { subject: 'Score Risco', value: Math.min(100, riskMetrics.scoreRisco), fullMark: 100 },
+    { subject: 'Max Drawdown', value: Math.min(100, riskMetrics.maxDrawdown), fullMark: 100 },
+    { subject: 'Volatilidade', value: Math.min(100, riskMetrics.volatilidade), fullMark: 100 },
+    { subject: 'VaR (95%)', value: Math.min(100, Math.abs(riskMetrics.valueAtRisk)), fullMark: 100 },
+    { subject: 'Kelly %', value: Math.min(100, riskMetrics.kellyPercentual), fullMark: 100 },
+  ];
+
+  const riskRadarDescription = {
+    'Score Risco': 'Índice geral de risco (0-100). Menor é melhor.',
+    'Max Drawdown': 'Maior queda percentual do seu capital. Menor é melhor.',
+    'Volatilidade': 'Variação dos seus retornos. Menor é mais estável.',
+    'VaR (95%)': 'Pior perda esperada em 95% dos casos. Menor é melhor.',
+    'Kelly %': 'Sugestão de stake. Valores altos indicam mais risco.',
+  };
   if (isLoading) {
     return (
       <div className="container mx-auto p-6 space-y-6">
@@ -1639,11 +1654,17 @@ export default function Analises() {
           <Card>
             <CardHeader>
               <CardTitle>Heatmap de Performance Mensal</CardTitle>
+              <CardDescription>
+                Visualize o ROI mensal ao longo dos anos. Passe o mouse sobre um mês para ver o lucro.
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="overflow-x-auto">
                 <div className="grid grid-cols-13 gap-2 min-w-max">
                   <div className="font-semibold text-sm p-2">Ano</div>
+                {/* Usando style para definir 13 colunas, pois o Tailwind não tem `grid-cols-13` por padrão */}
+                <div className="grid gap-2 min-w-max" style={{ gridTemplateColumns: 'repeat(13, minmax(0, 1fr))' }}>
+                  <div className="font-semibold text-sm p-2 text-muted-foreground">Ano</div>
                   {['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'].map(mes => (
                     <div key={mes} className="font-semibold text-sm p-2 text-center">{mes}</div>
                   ))}
