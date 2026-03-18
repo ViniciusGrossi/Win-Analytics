@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip, Legend } from "recharts";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -15,7 +16,7 @@ const COLORS = {
   Cashout: "hsl(var(--primary))",
 };
 
-export function DistributionChart({ data, isLoading }: DistributionChartProps) {
+export const DistributionChart = memo(({ data, isLoading }: DistributionChartProps) => {
   if (isLoading) {
     return <Skeleton className="h-[240px] sm:h-[300px] w-full" />;
   }
@@ -56,4 +57,4 @@ export function DistributionChart({ data, isLoading }: DistributionChartProps) {
       </div>
     </Card>
   );
-}
+});

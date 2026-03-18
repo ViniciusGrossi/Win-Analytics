@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { authService } from "@/services/authService";
 import type { Aposta, ApostaFormData, KPIData, SeriesData, ResultadoType } from "@/types/betting";
 import dayjs from "dayjs";
 
@@ -15,7 +16,7 @@ export interface ListParams {
 
 export const apostasService = {
   async list(params: ListParams = {}) {
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = authService.getSession();
     if (!user) throw new Error("Usuário não autenticado");
 
     let query = supabase
@@ -55,7 +56,7 @@ export const apostasService = {
   },
 
   async create(dto: ApostaFormData, bookieBalance: number, hasBonus: boolean = false) {
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = authService.getSession();
     if (!user) throw new Error("Usuário não autenticado");
 
     // Apenas validar saldo do valor apostado (não bônus)

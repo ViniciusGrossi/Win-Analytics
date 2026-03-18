@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
+import { authService } from "@/services/authService";
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Badge } from "@/components/ui/badge";
@@ -95,13 +96,19 @@ export default function Assistente() {
       timestamp: new Date(),
     };
 
+    const user = authService.getSession();
+    if (!user) return;
+
     setMessages((prev) => [...prev, userMessage]);
     setInput("");
     setIsLoading(true);
 
     try {
       const { data, error } = await supabase.functions.invoke('ai-assistant', {
-        body: { message: userMessage.content },
+        body: { 
+          message: userMessage.content,
+          user_id: user.id 
+        },
       });
 
       if (error) throw error;
@@ -153,7 +160,7 @@ export default function Assistente() {
           </div>
           <div>
             <h1 className="font-bold text-lg flex items-center gap-2">
-              Wager Art AI
+              Win Analytics AI
               <Badge variant="secondary" className="text-xs font-normal">Beta</Badge>
             </h1>
             <p className="text-xs text-muted-foreground">Assistente Pessoal de Apostas</p>

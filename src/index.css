@@ -2,65 +2,10 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
-*/
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Outfit:wght@200;300;400;500;600;700&display=swap');
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 240 10% 3.9%;
-
-    --card: 0 0% 100%;
-    --card-foreground: 240 10% 3.9%;
-
-    --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 3.9%;
-
-    --primary: 142.1 76.2% 36.3%;
-    --primary-foreground: 355.7 100% 97.3%;
-
-    --secondary: 240 4.8% 95.9%;
-    --secondary-foreground: 240 5.9% 10%;
-
-    --muted: 240 4.8% 95.9%;
-    --muted-foreground: 240 3.8% 46.1%;
-
-    --accent: 142.1 76.2% 36.3%;
-    --accent-foreground: 355.7 100% 97.3%;
-
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
-
-    --success: 142.1 76.2% 36.3%;
-    --success-foreground: 355.7 100% 97.3%;
-
-    --warning: 38 92% 50%;
-    --warning-foreground: 48 96% 89%;
-
-    --border: 240 5.9% 90%;
-    --input: 240 5.9% 90%;
-    --ring: 142.1 76.2% 36.3%;
-
-    --radius: 0.75rem;
-
-    --chart-1: 142.1 76.2% 36.3%;
-    --chart-2: 160 60% 45%;
-    --chart-3: 173 58% 39%;
-    --chart-4: 197 37% 24%;
-    --chart-5: 220 70% 50%;
-
-    --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: 240 5.3% 26.1%;
-    --sidebar-primary: 240 5.9% 10%;
-    --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 240 4.8% 95.9%;
-    --sidebar-accent-foreground: 240 5.9% 10%;
-    --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
-  }
-
-  .dark {
     --background: 240 10% 3.9%;
     --foreground: 0 0% 98%;
 
@@ -70,8 +15,8 @@ All colors MUST be HSL.
     --popover: 240 10% 8%;
     --popover-foreground: 0 0% 98%;
 
-    --primary: 142.1 70.6% 45.3%;
-    --primary-foreground: 144.9 80.4% 10%;
+    --primary: 45 61% 52%; /* gold-500 equivalent */
+    --primary-foreground: 240 10% 3.9%;
 
     --secondary: 240 3.7% 15.9%;
     --secondary-foreground: 0 0% 98%;
@@ -79,36 +24,38 @@ All colors MUST be HSL.
     --muted: 240 3.7% 15.9%;
     --muted-foreground: 240 5% 64.9%;
 
-    --accent: 142.1 70.6% 45.3%;
-    --accent-foreground: 144.9 80.4% 10%;
+    --accent: 45 61% 52%;
+    --accent-foreground: 240 10% 3.9%;
 
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 0 0% 98%;
 
-    --success: 142.1 70.6% 45.3%;
-    --success-foreground: 144.9 80.4% 10%;
+    --success: 160 84% 39%;
+    --success-foreground: 160 80% 10%;
 
     --warning: 38 92% 50%;
     --warning-foreground: 48 96% 89%;
 
     --border: 240 3.7% 15.9%;
     --input: 240 3.7% 15.9%;
-    --ring: 142.4 71.8% 29.2%;
+    --ring: 45 61% 52%;
 
-    --chart-1: 142.1 70.6% 45.3%;
+    --radius: 0.5rem;
+
+    --chart-1: 45 61% 52%;
     --chart-2: 160 60% 45%;
     --chart-3: 173 58% 39%;
     --chart-4: 197 37% 24%;
     --chart-5: 220 70% 50%;
 
-    --sidebar-background: 240 5.9% 10%;
+    --sidebar-background: 240 10% 6%;
     --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-primary: 45 61% 52%;
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 240 3.7% 15.9%;
     --sidebar-accent-foreground: 240 4.8% 95.9%;
     --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-ring: 45 61% 52%;
   }
 }
 
@@ -118,47 +65,89 @@ All colors MUST be HSL.
   }
 
   body {
-    @apply bg-background text-foreground;
+    background-color: #05080f;
+    color: #e5e7eb;
+    font-family: 'Inter', sans-serif;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Outfit', sans-serif;
   }
 }
 
 @layer utilities {
-  .glass-effect {
-    @apply bg-background/80 backdrop-blur-md border border-border/50;
+  .bg-grid {
+    background-size: 40px 40px;
+    background-image: 
+      linear-gradient(to right, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
   }
 
-  .hover-lift {
-    @apply transition-all duration-200 hover:-translate-y-1 hover:shadow-lg;
+  .ambient-glow-static {
+    position: fixed;
+    width: 80vw;
+    height: 80vh;
+    top: -20vh;
+    right: -20vw;
+    background: radial-gradient(circle, rgba(212, 175, 55, 0.04) 0%, transparent 60%);
+    pointer-events: none;
+    z-index: -1;
   }
 
-  .animate-fade-in {
-    animation: fade-in 0.3s ease-out;
+  .backdrop-glass {
+    backdrop-filter: blur(24px) saturate(180%);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    background: rgba(10, 15, 22, 0.65);
   }
 
-  @keyframes fade-in {
-    from {
-      opacity: 0;
-      transform: translateY(10px);
-    }
-
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
+  .glow-card {
+    background: linear-gradient(145deg, rgba(17, 24, 39, 0.8) 0%, rgba(10, 15, 22, 0.95) 100%);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 6px; 
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
   }
 
-  .animate-slide-in {
-    animation: slide-in 0.3s ease-out;
+  .glow-card:hover {
+    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(212, 175, 55, 0.2), 0 0 40px rgba(212, 175, 55, 0.1);
   }
 
-  @keyframes slide-in {
-    from {
-      transform: translateX(-100%);
-    }
+  .glow-border {
+    position: relative;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  
+  .glow-border:hover {
+    border-color: rgba(212, 175, 55, 0.4);
+    box-shadow: 0 0 20px rgba(212, 175, 55, 0.15);
+  }
 
-    to {
-      transform: translateX(0);
-    }
+  .text-gold-gradient {
+    @apply bg-clip-text text-transparent bg-gradient-to-br from-[#FDE68A] via-[#D4AF37] to-[#B48530];
+  }
+
+  .button-sweep {
+    @apply relative overflow-hidden transition-all duration-300;
+  }
+  
+  .button-sweep::before {
+    content: '';
+    @apply absolute top-0 -left-full w-full h-full bg-gradient-to-r from-transparent via-white/20 to-transparent transition-all duration-500;
+  }
+  
+  .button-sweep:hover::before {
+    @apply left-full;
+  }
+
+  .hover-glow {
+    @apply transition-all duration-300 hover:text-gold-300;
+    text-shadow: 0 0 10px rgba(212, 175, 55, 0);
+  }
+
+  .hover-glow:hover {
+    text-shadow: 0 0 15px rgba(212, 175, 55, 0.4);
   }
 }
 

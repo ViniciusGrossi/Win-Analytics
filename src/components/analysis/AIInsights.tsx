@@ -1,7 +1,9 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
+import { authService } from "@/services/authService";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
     TrendingUp,
@@ -13,7 +15,8 @@ import {
     AlertCircle,
     Lightbulb,
     TrendingDown,
-    Activity
+    Activity,
+    RefreshCw
 } from "lucide-react";
 
 interface AIInsight {
@@ -103,11 +106,18 @@ export function AIInsights() {
     }, []);
 
     const loadInsights = async () => {
+        const user = authService.getSession();
+        if (!user) {
+            setError("Usuário não identificado");
+            setIsLoading(false);
+            return;
+        }
+
         setIsLoading(true);
         setError(null);
         try {
             const { data, error } = await supabase.functions.invoke('ai-insights', {
-                body: {},
+                body: { user_id: user.id },
             });
 
             if (error) throw error;
@@ -144,12 +154,25 @@ export function AIInsights() {
 
     if (insights.length === 0) {
         return (
-            <Card className="border-muted">
-                <CardContent className="p-6 text-center">
-                    <Activity className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-                    <p className="text-sm text-muted-foreground">
-                        Nenhum insight disponível no momento. Continue apostando para gerar análises!
+            <Card className="border-muted bg-card/30 backdrop-blur-sm">
+                <CardContent className="p-8 text-center">
+                    <div className="p-3 bg-muted w-fit rounded-full mx-auto mb-4">
+                        <Activity className="h-8 w-8 text-muted-foreground" />
+                    </div>
+                    <h3 className="text-lg font-medium text-white mb-2">Pronto para a primeira análise?</h3>
+                    <p className="text-sm text-gray-400 mb-6 max-w-sm mx-auto">
+                        Registre suas primeiras apostas para que a Win Analytics AI possa gerar insights estratégicos para você.
                     </p>
+                    <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={loadInsights}
+                        disabled={isLoading}
+                        className="gap-2 border-gold-500/30 hover:border-gold-500/60"
+                    >
+                        <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+                        <span>Recalcular Agora</span>
+                    </Button>
                 </CardContent>
             </Card>
         );

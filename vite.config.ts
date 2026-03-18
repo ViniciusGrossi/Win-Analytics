@@ -22,8 +22,8 @@ export default defineConfig(({ mode }) => ({
         type: "module",
       },
       manifest: {
-        name: "WagerArt - Gestão de Apostas",
-        short_name: "WagerArt",
+        name: "Win Analytics - Gestão de Apostas",
+        short_name: "Win Analytics",
         description: "Plataforma premium de gestão de apostas esportivas",
         theme_color: "#10b981",
         background_color: "#0a0a0a",

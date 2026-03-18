@@ -1,9 +1,10 @@
 import { supabase } from "@/integrations/supabase/client";
+import { authService } from "@/services/authService";
 import type { Goal } from "@/types/betting";
 
 export const goalsService = {
   async get() {
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = authService.getSession();
     if (!user) throw new Error("Usuário não autenticado");
 
     const { data, error } = await supabase
@@ -19,7 +20,7 @@ export const goalsService = {
   },
 
   async upsert(goal: Partial<Goal>) {
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = authService.getSession();
     if (!user) throw new Error("Usuário não autenticado");
 
     const existing = await this.get();

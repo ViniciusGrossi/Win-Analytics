@@ -13,12 +13,12 @@ export function Topbar() {
     <motion.header
       initial={{ y: -20, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
-      className="sticky top-0 z-50 flex h-16 items-center gap-4 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-6"
+      className="sticky top-0 z-40 flex h-16 items-center gap-4 border-b border-white/5 backdrop-glass px-6 transition-all shadow-xl"
     >
-      <SidebarTrigger />
+      <SidebarTrigger className="text-gray-400 hover:text-gold-400 transition-colors" />
       <div className="flex-1" />
       {user && (
-        <span className="text-sm text-muted-foreground hidden sm:inline">
+        <span className="text-xs font-mono text-gray-500 hidden sm:inline hover-glow cursor-default">
           {user.email}
         </span>
       )}
@@ -26,7 +26,7 @@ export function Topbar() {
         variant="ghost"
         size="icon"
         onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-        className="rounded-full"
+        className="rounded-full text-gray-400 hover:text-gold-400 hover:bg-white/5"
       >
         <Sun className="h-5 w-5 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
         <Moon className="absolute h-5 w-5 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />

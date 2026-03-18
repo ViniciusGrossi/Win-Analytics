@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -68,7 +68,8 @@ import {
   Shield,
   Zap,
   Trophy,
-  Medal
+  Medal,
+  Sparkles
 } from "lucide-react";
 import dayjs from "dayjs";
 import 'dayjs/locale/pt-br';
@@ -89,10 +90,11 @@ import { RiscoTab } from "@/components/analysis/tabs/RiscoTab";
 import { TemporalTab } from "@/components/analysis/tabs/TemporalTab";
 import { PadroesTab } from "@/components/analysis/tabs/PadroesTab";
 import { TurboTab } from "@/components/analysis/tabs/TurboTab";
+import { MonteCarloTab } from "@/components/analysis/tabs/MonteCarloTab";
+import { PatternCorrelationTab } from "@/components/analysis/tabs/PatternCorrelationTab";
 import { CHART_COLORS } from "@/lib/constants";
 
 export default function Analises() {
-  const [apostas, setApostas] = useState<Aposta[]>([]);
   const [allApostas, setAllApostas] = useState<Aposta[]>([]); // Para extrair casas/mercados
   const [series, setSeries] = useState<SeriesData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -117,38 +119,67 @@ export default function Analises() {
     resetFilters
   } = useFilterStore();
 
-  // Hooks de métricas
-  const dashboardMetrics = useDashboardMetrics(apostas);
-  const performanceMetrics = usePerformanceMetrics(apostas);
-  const riskMetrics = useRiskMetrics(apostas);
-  const oddsMetrics = useOddsMetrics(apostas);
-  const temporalMetrics = useTemporalMetrics(apostas);
-  const patternsMetrics = usePatternsMetrics(apostas);
-  const exposureMetrics = useExposureMetrics(apostas);
-  const evMetrics = useEVMetrics(apostas);
-  const advancedRisk = useAdvancedRiskMetrics(apostas);
-  const turboMetrics = useTurboMetrics(apostas);
+  // Filtered apuestas memoized to avoid recalculation on tab switches
+  const filteredApostas = useMemo(() => {
+    let result = allApostas;
+
+    if (resultado && resultado !== "Todos") {
+      result = result.filter(a => a.resultado === resultado);
+    }
+
+    if (mercado && mercado !== "Todos") {
+      result = result.filter(a =>
+        a.detalhes?.toLowerCase().includes(mercado.toLowerCase())
+      );
+    }
+
+    if (oddMin) {
+      const min = parseFloat(oddMin);
+      if (!isNaN(min)) result = result.filter(a => (a.odd || 0) >= min);
+    }
+
+    if (oddMax) {
+      const max = parseFloat(oddMax);
+      if (!isNaN(max)) result = result.filter(a => (a.odd || 0) <= max);
+    }
+
+    return result;
+  }, [allApostas, resultado, mercado, oddMin, oddMax]);
+
+  // Hooks de métricas - Now using memoized filtered apuestas
+  const dashboardMetrics = useDashboardMetrics(filteredApostas);
+  const performanceMetrics = usePerformanceMetrics(filteredApostas);
+  const riskMetrics = useRiskMetrics(filteredApostas);
+  const oddsMetrics = useOddsMetrics(filteredApostas);
+  const temporalMetrics = useTemporalMetrics(filteredApostas);
+  const patternsMetrics = usePatternsMetrics(filteredApostas);
+  const exposureMetrics = useExposureMetrics(filteredApostas);
+  const evMetrics = useEVMetrics(filteredApostas);
+  const advancedRisk = useAdvancedRiskMetrics(filteredApostas);
+  const turboMetrics = useTurboMetrics(filteredApostas);
 
   // Dados para gráficos
-  const chartData = useChartData(apostas);
+  const chartData = useChartData(filteredApostas);
 
-  // Extrair valores únicos para filtros
-  const casasDisponiveis = Array.from(
-    new Set(allApostas.map(a => a.casa_de_apostas).filter(Boolean) as string[])
-  ).sort();
+  // Extrair valores únicos para filtros - Memoized
+  const casasDisponiveis = useMemo(() => 
+    Array.from(new Set(allApostas.map(a => a.casa_de_apostas).filter(Boolean) as string[])).sort()
+  , [allApostas]);
 
-  const mercadosDisponiveis = Array.from(
-    new Set(
-      allApostas
-        .map(a => a.detalhes)
-        .filter(Boolean)
-        .flatMap(d => d!.split(',').map(m => m.trim()))
-    )
-  ).sort();
+  const mercadosDisponiveis = useMemo(() => 
+    Array.from(
+      new Set(
+        allApostas
+          .map(a => a.detalhes)
+          .filter(Boolean)
+          .flatMap(d => d!.split(',').map(m => m.trim()))
+      )
+    ).sort()
+  , [allApostas]);
 
   useEffect(() => {
     loadData();
-  }, [startDate, endDate, casa, tipo, resultado, mercado, oddMin, oddMax]);
+  }, [startDate, endDate, casa, tipo]); // Only reload from API when core filters change
 
   const loadData = async () => {
     setIsLoading(true);
@@ -165,45 +196,7 @@ export default function Analises() {
         apostasService.series(params),
       ]);
 
-      // Guardar todas as apostas para filtros
       setAllApostas(apostasData.data);
-
-      // Aplicar filtros adicionais no frontend
-      let filteredApostas = apostasData.data;
-
-      // Filtro de resultado
-      if (resultado && resultado !== "Todos") {
-        filteredApostas = filteredApostas.filter(a => a.resultado === resultado);
-      }
-
-      // Filtro de mercado (detalhes contém informação de mercado)
-      if (mercado && mercado !== "Todos") {
-        filteredApostas = filteredApostas.filter(a =>
-          a.detalhes && a.detalhes.toLowerCase().includes(mercado.toLowerCase())
-        );
-      }
-
-      // Filtro de odd mínima
-      if (oddMin) {
-        const minOdd = parseFloat(oddMin);
-        if (!isNaN(minOdd)) {
-          filteredApostas = filteredApostas.filter(a =>
-            a.odd && a.odd >= minOdd
-          );
-        }
-      }
-
-      // Filtro de odd máxima
-      if (oddMax) {
-        const maxOdd = parseFloat(oddMax);
-        if (!isNaN(maxOdd)) {
-          filteredApostas = filteredApostas.filter(a =>
-            a.odd && a.odd <= maxOdd
-          );
-        }
-      }
-
-      setApostas(filteredApostas);
       setSeries(seriesData);
     } catch (error) {
       console.error("Erro ao carregar dados:", error);
@@ -310,6 +303,14 @@ export default function Analises() {
             <Zap className="h-4 w-4" />
             <span className="hidden md:inline">Turbo</span>
           </TabsTrigger>
+          <TabsTrigger value="montecarlo" className="gap-2">
+            <Activity className="h-4 w-4" />
+            <span className="hidden md:inline">Gestão de Risco</span>
+          </TabsTrigger>
+          <TabsTrigger value="correlacao" className="gap-2">
+            <Sparkles className="h-4 w-4" />
+            <span className="hidden md:inline">Padrões Ocultos</span>
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="dashboard" className="space-y-6">
@@ -371,6 +372,14 @@ export default function Analises() {
 
         <TabsContent value="turbo" className="space-y-6">
           <TurboTab turboMetrics={turboMetrics} />
+        </TabsContent>
+
+        <TabsContent value="montecarlo" className="space-y-6">
+          <MonteCarloTab apostas={filteredApostas} />
+        </TabsContent>
+
+        <TabsContent value="correlacao" className="space-y-6">
+          <PatternCorrelationTab apostas={filteredApostas} />
         </TabsContent>
       </Tabs>
     </motion.div>

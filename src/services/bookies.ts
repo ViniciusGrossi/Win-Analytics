@@ -1,9 +1,10 @@
 import { supabase } from "@/integrations/supabase/client";
+import { authService } from "@/services/authService";
 import type { Bookie } from "@/types/betting";
 
 export const bookiesService = {
   async list() {
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = authService.getSession();
     if (!user) throw new Error("Usuário não autenticado");
 
     const { data, error } = await supabase
@@ -17,7 +18,7 @@ export const bookiesService = {
   },
 
   async getByName(name: string) {
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = authService.getSession();
     if (!user) throw new Error("Usuário não autenticado");
 
     const { data, error } = await supabase
@@ -44,7 +45,7 @@ export const bookiesService = {
   },
 
   async create(name: string, initialBalance: number = 0) {
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = authService.getSession();
     if (!user) throw new Error("Usuário não autenticado");
 
     const { data, error } = await supabase
@@ -58,7 +59,7 @@ export const bookiesService = {
   },
 
   async delete(id: number) {
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = authService.getSession();
     if (!user) throw new Error("Usuário não autenticado");
 
     const { error } = await supabase

@@ -116,18 +116,24 @@ export default function Apostas() {
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="flex items-center justify-between flex-col sm:flex-row gap-3"
+        className="flex items-center justify-between flex-col sm:flex-row gap-4 mb-8"
       >
         <div>
-          <h1 className="text-2xl sm:text-4xl font-bold tracking-tight">Apostas</h1>
-          <p className="text-muted-foreground mt-1 text-sm sm:text-base">Gerencie todas as suas apostas</p>
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 backdrop-glass border border-white/10 rounded-full mb-3 text-[10px] font-mono text-gray-400 uppercase tracking-[0.2em] glow-border">
+            <span className="w-1.5 h-1.5 bg-gold-400 rounded-full shadow-[0_0_8px_rgba(212,175,55,0.8)]"></span>
+            Ledger Management
+          </div>
+          <h1 className="font-display text-3xl sm:text-5xl font-light tracking-tight text-white">
+            Histórico de <span className="text-gold-gradient font-medium">Apostas</span>
+          </h1>
+          <p className="text-sm text-gray-500 mt-2 font-light border-l border-gold-500/30 pl-3">Controle granular de ordens e bilhetes ativos</p>
         </div>
-        <div className="flex gap-2 w-full sm:w-auto">
-          <Button onClick={loadApostas} size="default" variant="outline" className="gap-2 flex-1 sm:flex-initial">
-            <RefreshCw className="h-4 w-4" />
-            <span className="hidden sm:inline">Atualizar</span>
+        <div className="flex gap-3 w-full sm:w-auto">
+          <Button onClick={loadApostas} variant="outline" className="gap-2 h-11 px-6">
+            <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+            <span>Atualizar</span>
           </Button>
-          <Button onClick={() => setDialogOpen(true)} size="default" className="gap-2 flex-1 sm:flex-initial">
+          <Button onClick={() => setDialogOpen(true)} className="gap-2 h-11 px-6">
             <Plus className="h-4 w-4" />
             Nova Aposta
           </Button>

@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, memo } from "react";
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -11,7 +11,7 @@ interface LucroChartProps {
   isLoading?: boolean;
 }
 
-export function LucroChart({ data, isLoading }: LucroChartProps) {
+export const LucroChart = memo(({ data, isLoading }: LucroChartProps) => {
   const chartData = useMemo(() => {
     let accumulated = 0;
     return data.map((item) => {
@@ -63,4 +63,4 @@ export function LucroChart({ data, isLoading }: LucroChartProps) {
       </div>
     </Card>
   );
-}
+});

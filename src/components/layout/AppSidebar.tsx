@@ -50,25 +50,28 @@ export function AppSidebar() {
   };
 
   return (
-    <Sidebar className="border-r">
+    <Sidebar className="border-r border-white/5 backdrop-glass">
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel className="text-xl font-bold px-4 py-6">
-            Wager<span className="text-primary">Art</span>
-          </SidebarGroupLabel>
+          <div className="flex items-center gap-3 px-6 py-8 group cursor-pointer" onClick={() => navigate("/")}>
+            <div className="w-8 h-8 rounded-md overflow-hidden border border-gold-500/30 flex items-center justify-center glow-border group-hover:scale-110 transition-transform">
+              <img src="/logo.png" alt="Win Analytics Logo" className="w-full h-full object-cover" />
+            </div>
+            <span className="font-display font-medium text-lg tracking-wide text-white hover-glow">WIN ANALYTICS</span>
+          </div>
           <SidebarGroupContent>
-            <SidebarMenu>
+            <SidebarMenu className="px-2">
               {menuItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
+                <SidebarMenuItem key={item.title} className="mb-1">
                   <SidebarMenuButton asChild>
                     <NavLink
                       to={item.url}
                       end={item.url === "/"}
-                      className="flex items-center gap-3 px-4 py-3 rounded-lg transition-all hover:bg-accent"
-                      activeClassName="bg-primary/10 text-primary font-medium border-l-4 border-primary"
+                      className="flex items-center gap-3 px-4 py-3 rounded-md transition-all group hover:bg-white/5"
+                      activeClassName="bg-gold-500/10 text-gold-400 font-medium border-l-2 border-gold-500 shadow-[0_0_15px_rgba(212,175,55,0.1)]"
                     >
-                      <item.icon className="h-5 w-5" />
-                      <span>{item.title}</span>
+                      <item.icon className="h-5 w-5 transition-colors group-hover:text-gold-400" />
+                      <span className="group-hover:text-white transition-colors">{item.title}</span>
                     </NavLink>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -78,11 +81,11 @@ export function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
       
-      <div className="mt-auto border-t border-border p-4 space-y-2">
+      <div className="mt-auto border-t border-white/5 p-4 space-y-2">
         <Button 
           onClick={handleInstallClick}
-          variant="default" 
-          className="w-full justify-start gap-3" 
+          variant="outline" 
+          className="w-full justify-start gap-3 border-white/10 hover:bg-gold-500/10 hover:text-gold-400 button-sweep" 
           size="sm"
         >
           <Download className="h-4 w-4" />
@@ -91,7 +94,7 @@ export function AppSidebar() {
         <Button 
           onClick={() => navigate("/configuracoes")}
           variant="ghost" 
-          className="w-full justify-start gap-3" 
+          className="w-full justify-start gap-3 text-gray-400 hover:text-white hover:bg-white/5" 
           size="sm"
         >
           <Settings className="h-4 w-4" />
@@ -100,7 +103,7 @@ export function AppSidebar() {
         <Button 
           onClick={handleSignOut}
           variant="ghost" 
-          className="w-full justify-start gap-3 text-destructive hover:text-destructive hover:bg-destructive/10" 
+          className="w-full justify-start gap-3 text-gray-500 hover:text-red-400 hover:bg-red-500/10" 
           size="sm"
         >
           <LogOut className="h-4 w-4" />

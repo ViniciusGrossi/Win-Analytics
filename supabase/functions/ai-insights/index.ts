@@ -31,28 +31,21 @@ serve(async (req) => {
             },
         });
 
-        // 2. Get User
-        const {
-            data: { user },
-            error: userError,
-        } = await supabase.auth.getUser();
+        // 2. Get Input Params
+        const { user_id, deep_analysis } = await req.json();
 
-        if (userError) {
-            console.error("Auth error details:", userError);
-            throw new Error(`Auth error: ${userError.message}`);
+        if (!user_id) {
+            throw new Error("user_id not found in request body");
         }
 
-        if (!user) {
-            throw new Error("User not found");
-        }
-
-        // 3. Fetch Betting Data (Last 100 bets for faster response)
+        // 3. Fetch Betting Data (Last 300 bets for deeper analysis)
+        const limit = deep_analysis ? 300 : 100;
         const { data: recentBets, error: betsError } = await supabase
             .from("aposta")
             .select("*")
-            .eq("user_id", user.id)
+            .eq("user_id", user_id)
             .order("data", { ascending: false })
-            .limit(100);
+            .limit(limit);
 
         if (betsError) {
             console.error("Error fetching bets:", betsError);
@@ -78,122 +71,113 @@ serve(async (req) => {
 
         const roi = totalInvested > 0 ? ((totalProfit / totalInvested) * 100).toFixed(1) : "0";
 
-        // Group by category
+        // Grouping for Deep Analysis
+        const temporalStats: any = {};
+        const oddRangeStats: any = { low: { t: 0, w: 0, p: 0 }, med: { t: 0, w: 0, p: 0 }, high: { t: 0, w: 0, p: 0 } };
         const categoryStats: any = {};
+
         recentBets?.forEach(bet => {
-            const category = bet.categoria || "Outros";
-            if (!categoryStats[category]) {
-                categoryStats[category] = { wins: 0, total: 0, profit: 0 };
-            }
-            categoryStats[category].total++;
+            // Category
+            const cat = bet.categoria || "Outros";
+            if (!categoryStats[cat]) categoryStats[cat] = { wins: 0, total: 0, profit: 0 };
+            categoryStats[cat].total++;
+            
+            // Temporal
+            const date = new Date(bet.data);
+            const dayName = date.toLocaleDateString('pt-BR', { weekday: 'long' });
+            if (!temporalStats[dayName]) temporalStats[dayName] = { wins: 0, total: 0, profit: 0 };
+            temporalStats[dayName].total++;
+
+            // Odds
+            const odd = bet.odd || 0;
+            let range = "low";
+            if (odd > 2.0 && odd <= 3.5) range = "med";
+            else if (odd > 3.5) range = "high";
+            oddRangeStats[range].t++;
+
             if (bet.resultado === "Ganhou") {
-                categoryStats[category].wins++;
-                categoryStats[category].profit += (bet.valor_final || 0) - (bet.valor_apostado || 0);
+                const profit = (bet.valor_final || 0) - (bet.valor_apostado || 0);
+                categoryStats[cat].wins++;
+                categoryStats[cat].profit += profit;
+                temporalStats[dayName].wins++;
+                temporalStats[dayName].profit += profit;
+                oddRangeStats[range].w++;
+                oddRangeStats[range].p += profit;
             } else if (bet.resultado === "Perdeu") {
-                categoryStats[category].profit -= (bet.valor_apostado || 0);
+                const loss = (bet.valor_apostado || 0);
+                categoryStats[cat].profit -= loss;
+                temporalStats[dayName].profit -= loss;
+                oddRangeStats[range].p -= loss;
             }
         });
 
         // 4. Initialize OpenAI
         const apiKey = Deno.env.get("OPENAI_API_KEY");
-        if (!apiKey) {
-            console.error("OPENAI_API_KEY not found");
-            throw new Error("OpenAI API Key not configured");
+        if (!apiKey) throw new Error("OpenAI API Key not configured");
+
+        const openai = new OpenAI({ apiKey });
+
+        // 5. Construct System Prompt
+        const systemPrompt = deep_analysis 
+        ? `
+        Você é o "Win Analytics Pro Engine", um motor de correlação de padrões para investidores esportivos profissionais.
+        Analise os clusters de dados abaixo e identifique 3 padrões ocultos (LEAKS ou OPORTUNIDADES).
+
+        CONTEXTO:
+        - Win Rate: ${winRate}% | ROI: ${roi}% | Total: ${totalBets} apostas
+        
+        CLUSTERS:
+        - Categorias: ${JSON.stringify(categoryStats)}
+        - Temporal: ${JSON.stringify(temporalStats)}
+        - Faixas de Odd (Low <2.0, Med 2.0-3.5, High >3.5): ${JSON.stringify(oddRangeStats)}
+
+        REGRAS:
+        1. Identifique correlações entre Dia da Semana, Faixa de Odd e ROI.
+        2. Seja extremamente técnico e quantitativo.
+        3. Retorne EXATAMENTE 3 padrões no JSON.
+        
+        FORMATO DE RESPOSTA JSON:
+        {
+          "patterns": [
+            {
+              "type": "leak" ou "opportunity",
+              "title": "Título Profissional",
+              "description": "Explicação técnica da correlação encontrada",
+              "impact": "Valor R$ ou % de ROI perdido/ganho",
+              "confidence": 0-100
+            }
+          ],
+          "insights": [] // manter compatibilidade com array de insights se necessário
         }
+        `
+        : `
+        Você é o "Win Analytics AI", analista executivo.
+        Gere 3 insights curtos e dinâmicos.
+        KPIs: ${winRate}% Acerto | R$ ${totalProfit.toFixed(2)} Lucro
+        Categorias: ${JSON.stringify(categoryStats)}
 
-        const openai = new OpenAI({
-            apiKey: apiKey,
-        });
+        FORMATO JSON:
+        {
+          "insights": [
+             {"title": "...", "description": "...", "emoji": "...", "color": "..."}
+          ]
+        }
+        `;
 
-        // 5. Construct System Prompt for Insights
-        const systemPrompt = `
-      Você é o "Wager Art AI", um analista de apostas esportivas profissional.
-      
-      DADOS DO USUÁRIO:
-      - Total de Apostas (últimas 100): ${totalBets}
-      - Apostas Ganhas: ${winningBets}
-      - Apostas Perdidas: ${losingBets}
-      - Taxa de Acerto: ${winRate}%
-      - ROI: ${roi}%
-      - Lucro Total: R$ ${totalProfit.toFixed(2)}
-      - Investimento Total: R$ ${totalInvested.toFixed(2)}
-      
-      PERFORMANCE POR CATEGORIA:
-      ${JSON.stringify(categoryStats, null, 2)}
-      
-      SUAS INSTRUÇÕES:
-      1. Gere EXATAMENTE 3 insights curtos, acionáveis e motivadores sobre a performance do usuário
-      2. Cada insight deve ter:
-         - Um título curto e cativante (máximo 4 palavras)
-         - Uma descrição de 1-2 linhas explicando o insight
-         - Um emoji relevante
-         - Uma cor (success, warning, destructive, primary, purple, ou blue)
-      3. Foque em padrões interessantes, conquistas ou áreas de melhoria
-      4. Use as cores de forma inteligente:
-         - success (verde): para lucros, recordes, boas notícias
-         - warning (amarelo): para alertas, tendências de queda
-         - destructive (vermelho): para prejuízos, riscos altos
-         - purple (roxo): para dicas estratégicas, curiosidades
-         - blue (azul claro): para informações neutras
-         - primary (azul padrão): para dados gerais
-      5. Use dados concretos do histórico
-      
-      Responda APENAS com um objeto JSON contendo um array "insights" neste formato exato:
-      {
-        "insights": [
-          {
-            "title": "Título do Insight",
-            "description": "Descrição breve e acionável",
-            "emoji": "🚀",
-            "color": "success"
-          }
-        ]
-      }
-      
-      Não adicione nenhum texto antes ou depois do JSON. Apenas o objeto JSON puro.
-    `;
-
-        // 6. Call OpenAI
         const completion = await openai.chat.completions.create({
-            messages: [
-                { role: "system", content: systemPrompt },
-                { role: "user", content: "Gere 3 insights inteligentes baseados nos meus dados" },
-            ],
+            messages: [{ role: "system", content: systemPrompt }],
             model: "gpt-4o-mini",
-            temperature: 0.8,
             response_format: { type: "json_object" }
         });
 
-        const aiResponse = completion.choices[0].message.content;
+        const data = JSON.parse(completion.choices[0].message.content || "{}");
 
-        // Parse the JSON response
-        let insights;
-        try {
-            const parsed = JSON.parse(aiResponse || "{}");
-            insights = parsed.insights || parsed;
-            if (!Array.isArray(insights)) {
-                insights = [parsed];
-            }
-        } catch (e) {
-            console.error("Failed to parse AI response:", aiResponse);
-            // Fallback insights
-            insights = [
-                {
-                    title: "Dados Disponíveis",
-                    description: `Você tem ${totalBets} apostas registradas com ${winRate}% de acerto.`,
-                    emoji: "📊",
-                    color: "primary"
-                }
-            ];
-        }
-
-        return new Response(JSON.stringify({ insights }), {
+        return new Response(JSON.stringify(data), {
             headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
     } catch (error) {
         console.error("Error:", error);
-        const errorMessage = error instanceof Error ? error.message : "Unknown error";
-        return new Response(JSON.stringify({ error: errorMessage }), {
+        return new Response(JSON.stringify({ error: error.message }), {
             status: 500,
             headers: { ...corsHeaders, "Content-Type": "application/json" },
         });

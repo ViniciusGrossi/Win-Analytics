@@ -13,12 +13,33 @@ export default {
       },
     },
     extend: {
+      fontFamily: {
+        sans: ['Inter', 'sans-serif'],
+        display: ['Outfit', 'sans-serif'],
+      },
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
+        executive: {
+          950: '#05080f',
+          900: '#0a0f16',
+          800: '#111827',
+          700: '#1f2937',
+        },
+        gold: {
+          300: '#FDE68A',
+          400: '#FBBF24',
+          500: '#D4AF37',
+          600: '#B48530',
+        },
+        emerald: {
+          400: '#34D399',
+          500: '#10B981',
+          600: '#059669',
+        },
         primary: {
           DEFAULT: "hsl(var(--primary))",
           foreground: "hsl(var(--primary-foreground))",

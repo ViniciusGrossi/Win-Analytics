@@ -19,8 +19,8 @@ import { ptBR } from "date-fns/locale";
 export default function Dashboard() {
   const [kpis, setKpis] = useState<KPIData | null>(null);
   const [series, setSeries] = useState<SeriesData[]>([]);
-  const [distribution, setDistribution] = useState<{ name: string; value: number }[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [distribution, setDistribution] = useState<{ name: string; value: number }[]>([]);
   const { startDate, endDate, casa, tipo, setStartDate, setEndDate, resetFilters } = useFilterStore();
 
   useEffect(() => {
@@ -39,7 +39,7 @@ export default function Dashboard() {
       setKpis(kpisData);
       setSeries(seriesData);
 
-      const statusCount = apostas.data.reduce((acc, aposta) => {
+      const statusCount = (apostas?.data || []).reduce((acc, aposta) => {
         const status = aposta.resultado || "Pendente";
         acc[status] = (acc[status] || 0) + 1;
         return acc;
@@ -55,16 +55,32 @@ export default function Dashboard() {
     }
   };
 
+  const formatDateSafely = (dateStr: string | null) => {
+    if (!dateStr) return null;
+    try {
+      const date = new Date(dateStr);
+      return isNaN(date.getTime()) ? null : format(date, "PPP", { locale: ptBR });
+    } catch {
+      return null;
+    }
+  };
+
   return (
     <div className="space-y-6 px-2 sm:px-4">
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="flex items-center justify-between flex-col sm:flex-row gap-3"
+        className="flex items-center justify-between flex-col sm:flex-row gap-4 mb-8"
       >
         <div>
-          <h1 className="text-2xl sm:text-4xl font-bold tracking-tight">Dashboard</h1>
-          <p className="text-muted-foreground mt-1">Visão geral do seu desempenho</p>
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 backdrop-glass border border-white/10 rounded-full mb-3 text-[10px] font-mono text-gray-400 uppercase tracking-[0.2em] glow-border">
+            <span className="w-1.5 h-1.5 bg-gold-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(212,175,55,0.8)]"></span>
+            Performance Real-time
+          </div>
+          <h1 className="font-display text-3xl sm:text-5xl font-light tracking-tight text-white">
+            Relatório <span className="text-gold-gradient font-medium">Executivo</span>
+          </h1>
+          <p className="text-sm text-gray-500 mt-2 font-light border-l border-gold-500/30 pl-3">Visão geral do seu capital e exposição em mercados esportivos</p>
         </div>
       </motion.div>
 
@@ -75,7 +91,7 @@ export default function Dashboard() {
               <PopoverTrigger asChild>
                 <Button variant="outline" className={cn("w-full sm:w-[240px] justify-start", !startDate && "text-muted-foreground")}
                 >
-                  {startDate ? format(new Date(startDate), "PPP", { locale: ptBR }) : "Data inicial"}
+                  {formatDateSafely(startDate) || "Data inicial"}
                   <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                 </Button>
               </PopoverTrigger>
@@ -93,7 +109,7 @@ export default function Dashboard() {
               <PopoverTrigger asChild>
                 <Button variant="outline" className={cn("w-full sm:w-[240px] justify-start", !endDate && "text-muted-foreground")}
                 >
-                  {endDate ? format(new Date(endDate), "PPP", { locale: ptBR }) : "Data final"}
+                  {formatDateSafely(endDate) || "Data final"}
                   <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                 </Button>
               </PopoverTrigger>

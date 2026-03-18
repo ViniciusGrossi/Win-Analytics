@@ -1,61 +1,44 @@
 import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import type { User, Session } from "@supabase/supabase-js";
+import { authService, CustomUser } from "@/services/authService";
 
 export const useAuth = () => {
-  const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
+  const [user, setUser] = useState<CustomUser | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Set up auth state listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
-        setLoading(false);
-      }
-    );
-
-    // Check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
-
-    return () => subscription.unsubscribe();
+    // Check for existing session in local storage
+    const sessionUser = authService.getSession();
+    setUser(sessionUser);
+    setLoading(false);
   }, []);
 
   const signUp = async (email: string, password: string) => {
-    const redirectUrl = `${window.location.origin}/`;
-    
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: redirectUrl
-      }
-    });
-    return { error };
+    const { user: newUser, error } = await authService.signUp(email, password);
+    if (!error && newUser) {
+      // In this system, we can auto-login or just let them login manually. 
+      // The user requested to be sent to login page, so we won't persist session here yet.
+      return { error: null };
+    }
+    return { error: error ? { message: error } : null };
   };
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-    return { error };
+    const { user: authUser, error } = await authService.signIn(email, password);
+    
+    if (!error && authUser) {
+      setUser(authUser);
+      authService.persistSession(authUser);
+      return { error: null };
+    }
+    
+    return { error: error ? { message: error } : null };
   };
 
   const signOut = async () => {
     try {
-      const { error } = await supabase.auth.signOut();
-      if (!error) {
-        setSession(null);
-        setUser(null);
-      }
-      return { error };
+      setUser(null);
+      authService.persistSession(null);
+      return { error: null };
     } catch (error) {
       console.error("Error signing out:", error);
       return { error: error as any };
@@ -64,7 +47,7 @@ export const useAuth = () => {
 
   return {
     user,
-    session,
+    session: user, // Alias for compatibility
     loading,
     signUp,
     signIn,
