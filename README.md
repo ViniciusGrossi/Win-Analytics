@@ -1,5 +1,5 @@
 <p align="center">
-  <h1 align="center">🎯 WagerArt (WinAlytics)</h1>
+  <h1 align="center">Win Analytics</h1>
   <p align="center">Plataforma premium de gestão e análise de apostas esportivas</p>
 </p>
 
@@ -16,7 +16,7 @@
 
 ## 📖 Sobre
 
-**WagerArt** é uma Progressive Web App (PWA) para gestão profissional de apostas esportivas. A plataforma permite registrar apostas, gerenciar bancas em múltiplas casas de apostas, acompanhar resultados em tempo real e analisar performance com métricas avançadas — incluindo um assistente de IA integrado.
+**Win Analytics** é uma Progressive Web App (PWA) para gestão profissional de apostas esportivas. A plataforma permite registrar apostas, gerenciar bancas em múltiplas casas de apostas, acompanhar resultados em tempo real e analisar performance com métricas avançadas — incluindo um assistente de IA integrado.
 
 ---
 
