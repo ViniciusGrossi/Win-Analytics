@@ -23,15 +23,23 @@ export function usePWA() {
 
   const installPWA = async () => {
     if (!deferredPrompt) {
+      console.warn("Prompt de instalação não disponível.");
       return;
     }
 
-    deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
+    try {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
 
-    if (outcome === "accepted") {
-      setDeferredPrompt(null);
-      setIsInstallable(false);
+      if (outcome === "accepted") {
+        console.log("Usuário aceitou a instalação do PWA");
+        setDeferredPrompt(null);
+        setIsInstallable(false);
+      } else {
+        console.log("Usuário recusou a instalação do PWA");
+      }
+    } catch (error) {
+      console.error("Erro ao tentar instalar o PWA:", error);
     }
   };
 

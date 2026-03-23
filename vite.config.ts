@@ -16,12 +16,13 @@ export default defineConfig(({ mode }) => ({
     VitePWA({
       registerType: "autoUpdate",
       injectRegister: "auto",
-      includeAssets: ["pwa-icon.png"],
+      includeAssets: ["favicon.png", "logo.png", "pwa-icon.png", "robots.txt"],
       devOptions: {
         enabled: true,
         type: "module",
       },
       manifest: {
+        id: "com.win-analytics.app",
         name: "Win Analytics - Gestão de Apostas",
         short_name: "Win Analytics",
         description: "Plataforma premium de gestão de apostas esportivas",
@@ -59,7 +60,7 @@ export default defineConfig(({ mode }) => ({
         ],
       },
       workbox: {
-        globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
+        globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2,webmanifest}"],
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/cjlvcjfuntfbdrrkigwh\.supabase\.co\/.*/i,
@@ -67,8 +68,11 @@ export default defineConfig(({ mode }) => ({
             options: {
               cacheName: "supabase-cache",
               expiration: {
-                maxEntries: 50,
-                maxAgeSeconds: 60 * 60 * 24, // 24 hours
+                maxEntries: 100,
+                maxAgeSeconds: 60 * 60 * 24 * 7, // 7 days
+              },
+              cacheableResponse: {
+                statuses: [0, 200],
               },
             },
           },

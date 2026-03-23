@@ -1,4 +1,34 @@
 # Ignore large lock files that aren't useful for context
 **/pnpm-lock.yaml
 **/package-lock.json
+**/yarn.lock
 **/uv.lock
+
+# Build & Dependencies
+**/.next/
+**/node_modules/
+**/out/
+**/build/
+**/dist/
+
+# Env & Secrets
+**/.env*
+**/*.pem
+**/secrets/
+
+# System & IDE
+**/.DS_Store
+**/.vercel/
+**/.vscode/
+**/.idea/
+**/.git/
+
+# Logs
+**/*.log
+**/npm-debug.log*
+**/yarn-debug.log*
+**/yarn-error.log*
+
+# Next.js specific
+**/next-env.d.ts
+**/*.tsbuildinfo

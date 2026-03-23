@@ -1,5 +1,6 @@
 <p align="center">
-  <h1 align="center">Win Analytics</h1>
+
+  <h1 align="center">🎯 Win Analytics</h1>
   <p align="center">Plataforma premium de gestão e análise de apostas esportivas</p>
 </p>
 
