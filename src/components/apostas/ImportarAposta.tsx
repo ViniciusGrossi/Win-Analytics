@@ -24,8 +24,14 @@ import { TORNEIOS, TIPOS_APOSTA, TURBO_OPTIONS } from "@/lib/apostas-constants";
 const SUPABASE_URL = "https://cjlvcjfuntfbdrrkigwh.supabase.co";
 
 const STATIC_TIPOS = [...TIPOS_APOSTA];
-
 const turboOptions = [...TURBO_OPTIONS];
+
+const DEFAULT_CATEGORIAS = [
+  "Resultado", "Ambas Marcam", "Total de Gols", "Handicap",
+  "Chutes ao Gol na Partida", "Placar Exato", "Dupla Hipótese",
+  "Primeiro a Marcar", "Cartões", "Escanteios", "Vencedor",
+  "Mais de 0.5 Gols", "Mais de 1.5 Gols", "Mais de 2.5 Gols",
+];
 
 const formSchema = z.object({
   casa_de_apostas: z.string().min(1, "Casa é obrigatória"),
@@ -254,23 +260,14 @@ export function ImportarAposta({ onSuccess, sharedImage }: ImportarApostaProps) 
 
   const tiposOptions = [...new Set([...STATIC_TIPOS, ...existingTipos])];
   const torneiosOptions = [...new Set([...TORNEIOS, ...existingTorneios])];
+  const casasOptions = bookies.map(b => b.name);
+  const categoriasOptions = [...new Set([...DEFAULT_CATEGORIAS, ...existingCategorias])];
 
   const isMissing = (field: string) => missingFields.has(field);
   const clearMissing = (field: string) => setMissingFields(s => { const n = new Set(s); n.delete(field); return n; });
 
   return (
     <div className="space-y-6">
-      {/* datalists para autocomplete */}
-      <datalist id="dl-torneios">
-        {existingTorneios.map(t => <option key={t} value={t} />)}
-      </datalist>
-      <datalist id="dl-categorias">
-        {existingCategorias.map(c => <option key={c} value={c} />)}
-      </datalist>
-      <datalist id="dl-casas">
-        {bookies.map(b => <option key={b.name} value={b.name} />)}
-      </datalist>
-
       <AnimatePresence mode="wait">
         {/* ── UPLOAD ── */}
         {step === "upload" && (
@@ -422,15 +419,16 @@ export function ImportarAposta({ onSuccess, sharedImage }: ImportarApostaProps) 
                     <FormLabel className={cn(isMissing("casa_de_apostas") && "text-red-500")}>
                       Casa de Apostas
                     </FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder="Ex: Bet365"
-                        list="dl-casas"
-                        {...field}
-                        className={cn(isMissing("casa_de_apostas") && "border-red-500 focus-visible:ring-red-500")}
-                        onChange={(e) => { field.onChange(e); if (e.target.value) clearMissing("casa_de_apostas"); }}
-                      />
-                    </FormControl>
+                    <Select value={field.value || ""} onValueChange={(v) => { field.onChange(v); clearMissing("casa_de_apostas"); }}>
+                      <FormControl>
+                        <SelectTrigger className={cn(isMissing("casa_de_apostas") && "border-red-500")}>
+                          <SelectValue placeholder="Selecione..." />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent className="max-h-60 overflow-y-auto [touch-action:pan-y]">
+                        {casasOptions.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )} />
@@ -495,9 +493,16 @@ export function ImportarAposta({ onSuccess, sharedImage }: ImportarApostaProps) 
                   <FormField control={form.control} name="categoria" render={({ field }) => (
                     <FormItem>
                       <FormLabel>Categoria</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Ex: Resultado" list="dl-categorias" {...field} />
-                      </FormControl>
+                      <Select value={field.value || ""} onValueChange={field.onChange}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione..." />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent className="max-h-60 overflow-y-auto [touch-action:pan-y]">
+                          {categoriasOptions.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
                     </FormItem>
                   )} />
                 </div>

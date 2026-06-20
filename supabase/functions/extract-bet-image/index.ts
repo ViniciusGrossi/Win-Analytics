@@ -68,10 +68,12 @@ REGRAS DE EXTRAÇÃO:
 - torneio: OBRIGATÓRIO usar um dos valores da lista acima se a competição corresponder. Ex: "English Premier League"/"EPL"/"PL" → "Premier League". "UEFA Champions League" → "Champions League". TURBINACO não é torneio — é um produto da Betnacional; extraia a competição real ou retorne null. Se não corresponder a nenhum da lista, retorne null
 - casa_de_apostas: se a casa estiver na lista cadastrada, use o nome EXATO da lista. Se não estiver, use o nome que aparecer na imagem ou identifique pelos padrões visuais. TURBINACO e eventos com "(BN)" indicam Betnacional
 - data: extraia dia e mês da imagem. Para o ANO, use SEMPRE ${currentYear} exceto se um ano diferente estiver claramente impresso na imagem E fizer sentido (ex: aposta futura). Se só vir "HH:MM" ou "DD/MM" sem ano, use ${currentYear}
+- valor_apostado: valor em REAIS (R$) que o usuário pagou/apostou. Vem rotulado como "Valor", "Aposta", "Stake", "R$", "Valor da Aposta". É SEMPRE acompanhado de símbolo monetário (R$). NUNCA confunda com a odd (que é um número decimal sem R$). Exemplo: se a imagem mostra "R$ 20,00" ao lado de "Valor da Aposta" e "3.00" ao lado de "Odd", então valor_apostado=20, odd=3
+- odd: multiplicador decimal SEM símbolo monetário (ex: 1.50, 2.30, 3.00). Vem rotulado como "Odd", "Cota", "@ 3.00". Verificação cruzada: valor_apostado × odd ≈ "Potencial ganho" ou "Retorno". Se valor_apostado=20 e odd=3, potencial=60. Se não bater, revise os dois campos
 - is_super_odd: true se houver badge/destaque de Super Odd, Odd Boost, Odd Melhorada, Aposta Especial, ou prefixo TURBINACO (produto de Super Odds da Betnacional)
 - bonus: 0 para dinheiro real. Valor se indicar Freebet, Bônus, Saldo Bônus, Aposta Grátis
 - turbo: 0 se não houver boost. "+25%" → 0.25, "+30%" → 0.30, "+50%" → 0.50
-- categoria: tipo de mercado (ex: "Resultado", "Ambas Marcam", "Total de Gols", "Handicap", "Chutes ao Gol")
+- categoria: tipo de mercado (ex: "Resultado", "Ambas Marcam", "Total de Gols", "Handicap", "Chutes ao Gol na Partida")
 - Para campos não encontrados, use null
 - Responda APENAS com o JSON, sem markdown, sem explicações`;
 }
