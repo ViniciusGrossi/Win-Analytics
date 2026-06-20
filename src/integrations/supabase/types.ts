@@ -22,6 +22,7 @@ export type Database = {
           data: string | null
           detalhes: string | null
           id: number
+          is_super_odd: boolean | null
           odd: number | null
           partida: string | null
           resultado: string | null
@@ -39,6 +40,7 @@ export type Database = {
           data?: string | null
           detalhes?: string | null
           id?: number
+          is_super_odd?: boolean | null
           odd?: number | null
           partida?: string | null
           resultado?: string | null
@@ -56,6 +58,7 @@ export type Database = {
           data?: string | null
           detalhes?: string | null
           id?: number
+          is_super_odd?: boolean | null
           odd?: number | null
           partida?: string | null
           resultado?: string | null

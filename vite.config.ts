@@ -32,6 +32,19 @@ export default defineConfig(({ mode }) => ({
         orientation: "portrait-primary",
         start_url: "/",
         scope: "/",
+        share_target: {
+          action: "/importar",
+          method: "POST",
+          enctype: "multipart/form-data",
+          params: {
+            files: [
+              {
+                name: "image",
+                accept: ["image/png", "image/jpeg", "image/webp", "image/gif"],
+              },
+            ],
+          },
+        },
         icons: [
           {
             src: "pwa-icon.png",

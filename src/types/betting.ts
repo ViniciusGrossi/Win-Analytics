@@ -8,6 +8,7 @@ export interface Aposta {
   valor_final: number | null;
   bonus: number | null;
   turbo: number | null;
+  is_super_odd: boolean | null;
   resultado: string | null;
   detalhes: string | null;
   partida: string | null;
@@ -33,6 +34,7 @@ export interface ApostaFormData {
   odd: number;
   bonus: number;
   turbo: number;
+  is_super_odd: boolean;
   detalhes?: string;
   partida?: string;
   torneio?: string;

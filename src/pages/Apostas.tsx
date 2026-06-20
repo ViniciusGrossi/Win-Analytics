@@ -1,12 +1,14 @@
 import { useState, useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { Plus, RefreshCw } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Plus, RefreshCw, ScanLine } from "lucide-react";
 import { apostasService } from "@/services/apostas";
 import { ApostasTable } from "@/components/apostas/ApostasTable";
 import { CreateApostaDialog } from "@/components/apostas/CreateApostaDialog";
 import { ApostasFilters } from "@/components/apostas/ApostasFilters";
 import { ApostasStats } from "@/components/apostas/ApostasStats";
+import { ImportarAposta } from "@/components/apostas/ImportarAposta";
 import type { Aposta, ResultadoType } from "@/types/betting";
 import { startOfDay, endOfDay, subDays, isWithinInterval, parseISO } from "date-fns";
 
@@ -14,6 +16,8 @@ export default function Apostas() {
   const [apostas, setApostas] = useState<Aposta[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<"apostas" | "importar">("apostas");
+  const [sharedImage, setSharedImage] = useState<File | null>(null);
   const [selectedStatus, setSelectedStatus] = useState<ResultadoType | "Todos">("Todos");
   const [selectedCasa, setSelectedCasa] = useState<string>("Todas");
   const [selectedPeriod, setSelectedPeriod] = useState<string>("all");
@@ -23,7 +27,33 @@ export default function Apostas() {
 
   useEffect(() => {
     loadApostas();
+    handleShareTarget();
   }, []);
+
+  // Detecta imagem compartilhada via PWA share target
+  const handleShareTarget = async () => {
+    if (location.pathname !== "/importar") return;
+    try {
+      // Share target via POST: a imagem chega como form data na URL
+      // O service worker intercepta e redireciona para cá com ?shared=1
+      const params = new URLSearchParams(location.search);
+      if (params.get("shared") === "1") {
+        const cache = await caches.open("share-target");
+        const response = await cache.match("/shared-image");
+        if (response) {
+          const blob = await response.blob();
+          const file = new File([blob], "shared-image.jpg", { type: blob.type || "image/jpeg" });
+          setSharedImage(file);
+          await cache.delete("/shared-image");
+        }
+        setActiveTab("importar");
+      } else {
+        setActiveTab("importar");
+      }
+    } catch {
+      setActiveTab("importar");
+    }
+  };
 
   const loadApostas = async () => {
     setIsLoading(true);
@@ -140,29 +170,57 @@ export default function Apostas() {
         </div>
       </motion.div>
 
-      <ApostasStats apostas={apostasFiltradas} />
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "apostas" | "importar")}>
+        <TabsList className="mb-4">
+          <TabsTrigger value="apostas" className="gap-2">
+            <RefreshCw className="h-4 w-4" />
+            Apostas
+          </TabsTrigger>
+          <TabsTrigger value="importar" className="gap-2">
+            <ScanLine className="h-4 w-4" />
+            Importar via IA
+          </TabsTrigger>
+        </TabsList>
 
-      <div className="space-y-4">
-        <ApostasFilters
-          selectedStatus={selectedStatus}
-          onStatusChange={setSelectedStatus}
-          selectedCasa={selectedCasa}
-          onCasaChange={setSelectedCasa}
-          casasDisponiveis={casasDisponiveis}
-          selectedPeriod={selectedPeriod}
-          onPeriodChange={setSelectedPeriod}
-          selectedCategory={selectedCategory}
-          onCategoryChange={setSelectedCategory}
-          categoriesAvailable={categoriesAvailable}
-          selectedTorneio={selectedTorneio}
-          onTorneioChange={setSelectedTorneio}
-          torneiosAvailable={torneiosAvailable}
-          dateRange={dateRange}
-          onDateRangeChange={setDateRange}
-        />
+        <TabsContent value="apostas" className="space-y-4">
+          <ApostasStats apostas={apostasFiltradas} />
 
-        <ApostasTable data={apostasFiltradas} isLoading={isLoading} onReload={loadApostas} />
-      </div>
+          <ApostasFilters
+            selectedStatus={selectedStatus}
+            onStatusChange={setSelectedStatus}
+            selectedCasa={selectedCasa}
+            onCasaChange={setSelectedCasa}
+            casasDisponiveis={casasDisponiveis}
+            selectedPeriod={selectedPeriod}
+            onPeriodChange={setSelectedPeriod}
+            selectedCategory={selectedCategory}
+            onCategoryChange={setSelectedCategory}
+            categoriesAvailable={categoriesAvailable}
+            selectedTorneio={selectedTorneio}
+            onTorneioChange={setSelectedTorneio}
+            torneiosAvailable={torneiosAvailable}
+            dateRange={dateRange}
+            onDateRangeChange={setDateRange}
+          />
+
+          <ApostasTable data={apostasFiltradas} isLoading={isLoading} onReload={loadApostas} />
+        </TabsContent>
+
+        <TabsContent value="importar">
+          <div className="max-w-lg mx-auto">
+            <div className="mb-4">
+              <h2 className="text-lg font-semibold">Importar Aposta via IA</h2>
+              <p className="text-sm text-muted-foreground">
+                Envie o print da aposta — o modelo extrai todos os dados automaticamente.
+              </p>
+            </div>
+            <ImportarAposta
+              onSuccess={() => { loadApostas(); setActiveTab("apostas"); }}
+              sharedImage={sharedImage}
+            />
+          </div>
+        </TabsContent>
+      </Tabs>
 
       <CreateApostaDialog
         open={dialogOpen}

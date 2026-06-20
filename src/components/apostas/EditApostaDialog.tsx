@@ -18,7 +18,7 @@ import { bookiesService } from "@/services/bookies";
 import { apostasService } from "@/services/apostas";
 import type { Bookie, Aposta, ApostaFormData } from "@/types/betting";
 import { formatCurrency, cn } from "@/lib/utils";
-import { CalendarIcon, Wallet, Zap, Gift, Info, Edit, Trash2, AlertTriangle, X, Check, ChevronsUpDown } from "lucide-react";
+import { CalendarIcon, Wallet, Zap, Gift, Info, Edit, Trash2, AlertTriangle, X, Check, ChevronsUpDown, Star } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -30,6 +30,7 @@ const formSchema = z.object({
   odd: z.number().min(1.01, "Odd mínima é 1.01"),
   bonus: z.number().min(0).default(0),
   turbo: z.number().min(0).default(0),
+  is_super_odd: z.boolean().default(false),
   detalhes: z.string().optional(),
   partida: z.string().optional(),
   torneio: z.string().optional(),
@@ -60,7 +61,7 @@ const categorias = [
   "Outros",
 ];
 
-const tiposAposta = ["Simples", "Dupla", "Tripla", "Múltipla", "Super Odd"];
+const tiposAposta = ["Simples", "Dupla", "Tripla", "Múltipla"];
 
 const torneios = [
   "Brasileirao Serie A",
@@ -68,6 +69,7 @@ const torneios = [
   "Champions League",
   "Europa League",
   "Conference League",
+  "Copa do Mundo FIFA",
   "Premier League",
   "La Liga",
   "Bundesliga",
@@ -112,6 +114,7 @@ export function EditApostaDialog({ open, onOpenChange, aposta, onSuccess }: Edit
   const [bookieSearch, setBookieSearch] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [hasBonus, setHasBonus] = useState(false);
+  const [isSuperOdd, setIsSuperOdd] = useState(false);
   const [selectedTurbo, setSelectedTurbo] = useState(0);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [bookieOpen, setBookieOpen] = useState(false);
@@ -157,12 +160,14 @@ export function EditApostaDialog({ open, onOpenChange, aposta, onSuccess }: Edit
         odd: aposta.odd || undefined as any,
         bonus: aposta.bonus || 0,
         turbo: aposta.turbo || 0,
+        is_super_odd: aposta.is_super_odd ?? false,
         detalhes: aposta.detalhes || "",
         partida: aposta.partida || "",
         torneio: aposta.torneio || "",
         data: aposta.data ? new Date(aposta.data) : undefined as any,
       });
       setHasBonus(Boolean(aposta.bonus && aposta.bonus > 0));
+      setIsSuperOdd(aposta.is_super_odd ?? false);
       setSelectedTurbo(aposta.turbo || 0);
     }
   }, [aposta]);
@@ -190,13 +195,14 @@ export function EditApostaDialog({ open, onOpenChange, aposta, onSuccess }: Edit
     setIsLoading(true);
     try {
       const dto: ApostaFormData = {
-        categoria: data.categoria.join(", "), // Converte array para string
+        categoria: data.categoria.join(", "),
         tipo_aposta: data.tipo_aposta,
         casa_de_apostas: data.casa_de_apostas,
         valor_apostado: data.valor_apostado,
         odd: data.odd,
         bonus: hasBonus ? data.bonus : 0,
         turbo: selectedTurbo,
+        is_super_odd: isSuperOdd,
         detalhes: data.detalhes,
         partida: data.partida,
         torneio: data.torneio,
@@ -744,6 +750,23 @@ export function EditApostaDialog({ open, onOpenChange, aposta, onSuccess }: Edit
                   </Button>
                 ))}
               </div>
+            </div>
+
+            {/* Super Odd Toggle */}
+            <div className="flex items-center justify-between">
+              <FormLabel className="flex items-center gap-2">
+                <Star className="h-4 w-4" />
+                Super Odd
+              </FormLabel>
+              <Button
+                type="button"
+                variant={isSuperOdd ? "default" : "outline"}
+                size="sm"
+                onClick={() => setIsSuperOdd(!isSuperOdd)}
+                className="transition-all"
+              >
+                {isSuperOdd ? "Ativada" : "Desativada"}
+              </Button>
             </div>
 
             <div className="flex gap-3 pt-4">
