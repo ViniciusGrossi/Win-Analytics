@@ -50,7 +50,8 @@ const categorias = [
   "Chance Dupla",
   "Chutes ao Gol",
   "Ambas Marcam",
-  "Faltas",
+  "Sofrer Falta",
+  "Cometer Falta",
   "Cartoes",
   "Defesas",
   "Tiros livres",
@@ -86,6 +87,7 @@ export function EditApostaDialog({ open, onOpenChange, aposta, onSuccess }: Edit
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [bookieOpen, setBookieOpen] = useState(false);
   const [tournamentOpen, setTournamentOpen] = useState(false);
+  const [oddInputs, setOddInputs] = useState<string[]>([""]);
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -107,6 +109,15 @@ export function EditApostaDialog({ open, onOpenChange, aposta, onSuccess }: Edit
   useEffect(() => {
     form.setValue("turbo", selectedTurbo);
   }, [selectedTurbo]);
+
+  const computedOdd = oddInputs.reduce((acc, v) => {
+    const n = parseFloat(v);
+    return isFinite(n) && n > 1 ? acc * n : acc;
+  }, 1);
+
+  useEffect(() => {
+    form.setValue("odd", computedOdd > 1 ? parseFloat(computedOdd.toFixed(2)) : (undefined as any), { shouldValidate: false });
+  }, [oddInputs]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (open) loadBookies();
@@ -136,6 +147,7 @@ export function EditApostaDialog({ open, onOpenChange, aposta, onSuccess }: Edit
       setHasBonus(Boolean(aposta.bonus && aposta.bonus > 0));
       setIsSuperOdd(aposta.is_super_odd ?? false);
       setSelectedTurbo(aposta.turbo || 0);
+      setOddInputs([String(aposta.odd || "")]);
     }
   }, [aposta]);
 
@@ -372,6 +384,23 @@ export function EditApostaDialog({ open, onOpenChange, aposta, onSuccess }: Edit
                   </FormItem>
                 )}
               />
+            </div>
+
+            {/* Super Odd Toggle */}
+            <div className="flex items-center justify-between">
+              <FormLabel className="flex items-center gap-2">
+                <Star className="h-4 w-4" />
+                Super Odd
+              </FormLabel>
+              <Button
+                type="button"
+                variant={isSuperOdd ? "default" : "outline"}
+                size="sm"
+                onClick={() => setIsSuperOdd(!isSuperOdd)}
+                className="transition-all"
+              >
+                {isSuperOdd ? "Ativada" : "Desativada"}
+              </Button>
             </div>
 
             <FormField
@@ -634,19 +663,39 @@ export function EditApostaDialog({ open, onOpenChange, aposta, onSuccess }: Edit
               <FormField
                 control={form.control}
                 name="odd"
-                render={({ field }) => (
+                render={() => (
                   <FormItem>
                     <FormLabel>Odd</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        placeholder="Digite a odd"
-                        {...field}
-                        value={field.value || ""}
-                        onChange={(e) => field.onChange(e.target.value ? parseFloat(e.target.value) : undefined)}
-                      />
-                    </FormControl>
+                    <div className="space-y-1.5">
+                      {oddInputs.map((val, i) => (
+                        <div key={i} className="flex gap-1.5 items-center">
+                          <Input
+                            type="number" step="0.01"
+                            placeholder={oddInputs.length > 1 ? `Seleção ${i + 1}` : "Ex: 2.50"}
+                            value={val}
+                            onChange={(e) => {
+                              const next = [...oddInputs]; next[i] = e.target.value; setOddInputs(next);
+                            }}
+                            className="flex-1 min-w-0"
+                          />
+                          {oddInputs.length > 1 && (
+                            <Button type="button" variant="ghost" size="icon" className="h-10 w-10 shrink-0"
+                              onClick={() => setOddInputs(prev => prev.filter((_, idx) => idx !== i))}>
+                              <X className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
+                      ))}
+                      <Button type="button" variant="outline" size="sm" className="w-full text-xs h-8"
+                        onClick={() => setOddInputs(prev => [...prev, ""])}>
+                        + Adicionar odd
+                      </Button>
+                      {oddInputs.filter(v => parseFloat(v) > 1).length > 1 && (
+                        <p className="text-xs text-muted-foreground">
+                          Odd total: <span className="font-medium text-foreground">{computedOdd.toFixed(2)}</span>
+                        </p>
+                      )}
+                    </div>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -717,23 +766,6 @@ export function EditApostaDialog({ open, onOpenChange, aposta, onSuccess }: Edit
                   </Button>
                 ))}
               </div>
-            </div>
-
-            {/* Super Odd Toggle */}
-            <div className="flex items-center justify-between">
-              <FormLabel className="flex items-center gap-2">
-                <Star className="h-4 w-4" />
-                Super Odd
-              </FormLabel>
-              <Button
-                type="button"
-                variant={isSuperOdd ? "default" : "outline"}
-                size="sm"
-                onClick={() => setIsSuperOdd(!isSuperOdd)}
-                className="transition-all"
-              >
-                {isSuperOdd ? "Ativada" : "Desativada"}
-              </Button>
             </div>
 
             <div className="flex gap-3 pt-4">

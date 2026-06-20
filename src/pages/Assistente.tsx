@@ -159,7 +159,7 @@ export default function Assistente() {
   };
 
   return (
-    <div className="h-[calc(100vh-100px)] max-w-7xl mx-auto flex flex-col gap-4 p-4">
+    <div className="h-[calc(100dvh-100px)] max-w-7xl mx-auto flex flex-col gap-4 p-3 sm:p-4">
       {/* Header Compacto */}
       <div className="flex items-center justify-between bg-card p-3 rounded-xl border shadow-sm shrink-0">
         <div className="flex items-center gap-3">
@@ -167,35 +167,35 @@ export default function Assistente() {
             <Bot className="h-5 w-5 text-primary" />
           </div>
           <div>
-            <h1 className="font-bold text-lg flex items-center gap-2">
-              Win Analytics AI
+            <h1 className="font-bold text-base sm:text-lg flex items-center gap-2">
+              <span className="hidden xs:inline">Win Analytics</span> AI
               <Badge variant="secondary" className="text-xs font-normal">Beta</Badge>
             </h1>
-            <p className="text-xs text-muted-foreground">Assistente Pessoal de Apostas</p>
+            <p className="text-xs text-muted-foreground hidden sm:block">Assistente Pessoal de Apostas</p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           {/* Model toggle */}
           <div className="flex items-center rounded-lg border bg-muted p-0.5 gap-0.5">
             <Button
               variant={modelMode === "fast" ? "default" : "ghost"}
               size="sm"
-              className="h-7 px-2.5 text-xs gap-1.5"
+              className="h-7 px-2 text-xs gap-1"
               onClick={() => setModelMode("fast")}
               title="Llama 3.3 70B — respostas rápidas"
             >
               <Zap className="h-3 w-3" />
-              Rápido
+              <span className="hidden sm:inline">Rápido</span>
             </Button>
             <Button
               variant={modelMode === "deep" ? "default" : "ghost"}
               size="sm"
-              className="h-7 px-2.5 text-xs gap-1.5"
+              className="h-7 px-2 text-xs gap-1"
               onClick={() => setModelMode("deep")}
               title="Nemotron 550B — análise profunda com raciocínio"
             >
               <Brain className="h-3 w-3" />
-              Profundo
+              <span className="hidden sm:inline">Profundo</span>
             </Button>
           </div>
           <Badge variant="outline" className="hidden md:flex gap-1">
@@ -207,7 +207,7 @@ export default function Assistente() {
             size="icon"
             onClick={handleClearChat}
             title="Limpar conversa"
-            className="text-muted-foreground hover:text-destructive"
+            className="h-8 w-8 text-muted-foreground hover:text-destructive"
           >
             <Trash2 className="h-4 w-4" />
           </Button>

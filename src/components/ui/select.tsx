@@ -74,10 +74,9 @@ const SelectContent = React.forwardRef<
       position={position}
       {...props}
     >
-      <SelectScrollUpButton />
       <SelectPrimitive.Viewport
         className={cn(
-          "p-1 overflow-y-auto [touch-action:pan-y]",
+          "p-1 overflow-y-auto [touch-action:pan-y] [-webkit-overflow-scrolling:touch]",
           position === "popper"
             ? "max-h-60 w-full min-w-[var(--radix-select-trigger-width)]"
             : "max-h-60",
@@ -85,7 +84,6 @@ const SelectContent = React.forwardRef<
       >
         {children}
       </SelectPrimitive.Viewport>
-      <SelectScrollDownButton />
     </SelectPrimitive.Content>
   </SelectPrimitive.Portal>
 ));

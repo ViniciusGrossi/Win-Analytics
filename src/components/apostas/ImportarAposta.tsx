@@ -30,6 +30,7 @@ const DEFAULT_CATEGORIAS = [
   "Resultado", "Ambas Marcam", "Total de Gols", "Handicap",
   "Chutes ao Gol na Partida", "Placar Exato", "Dupla Hipótese",
   "Primeiro a Marcar", "Cartões", "Escanteios", "Vencedor",
+  "Sofrer Falta", "Cometer Falta",
   "Mais de 0.5 Gols", "Mais de 1.5 Gols", "Mais de 2.5 Gols",
 ];
 
@@ -87,7 +88,17 @@ export function ImportarAposta({ onSuccess, sharedImage }: ImportarApostaProps) 
   const [selectedTurbo, setSelectedTurbo] = useState(0);
   const [hasBonus, setHasBonus] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [oddInputs, setOddInputs] = useState<string[]>([""]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const computedOdd = oddInputs.reduce((acc, v) => {
+    const n = parseFloat(v);
+    return isFinite(n) && n > 1 ? acc * n : acc;
+  }, 1);
+
+  useEffect(() => {
+    form.setValue("odd", computedOdd > 1 ? parseFloat(computedOdd.toFixed(2)) : (undefined as any), { shouldValidate: false });
+  }, [oddInputs]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -205,6 +216,7 @@ export function ImportarAposta({ onSuccess, sharedImage }: ImportarApostaProps) 
       setIsSuperOdd(data.is_super_odd ?? false);
       setSelectedTurbo(data.turbo ?? 0);
       setHasBonus((data.bonus ?? 0) > 0);
+      setOddInputs([data.odd ? String(data.odd) : ""]);
       setStep("review");
     } catch (error) {
       toast({ title: "Erro na extração", description: error instanceof Error ? error.message : "Erro", variant: "destructive" });
@@ -256,6 +268,7 @@ export function ImportarAposta({ onSuccess, sharedImage }: ImportarApostaProps) 
     setIsSuperOdd(false);
     setSelectedTurbo(0);
     setHasBonus(false);
+    setOddInputs([""]);
   };
 
   const tiposOptions = [...new Set([...STATIC_TIPOS, ...existingTipos])];
@@ -307,7 +320,7 @@ export function ImportarAposta({ onSuccess, sharedImage }: ImportarApostaProps) 
               )}
             </div>
 
-            <input ref={fileInputRef} type="file" accept="image/*" capture="environment" className="hidden"
+            <input ref={fileInputRef} type="file" accept="image/*" className="hidden"
               onChange={(e) => { if (e.target.files?.[0]) handleFile(e.target.files[0]); }} />
 
             {imagePreview && (
@@ -448,15 +461,36 @@ export function ImportarAposta({ onSuccess, sharedImage }: ImportarApostaProps) 
                     </FormItem>
                   )} />
 
-                  <FormField control={form.control} name="odd" render={({ field }) => (
+                  <FormField control={form.control} name="odd" render={() => (
                     <FormItem>
                       <FormLabel className={cn(isMissing("odd") && "text-red-500")}>Odd</FormLabel>
-                      <FormControl>
-                        <Input type="number" step="0.01" placeholder="0.00"
-                          {...field} value={field.value ?? ""}
-                          onChange={(e) => { field.onChange(e.target.value ? parseFloat(e.target.value) : undefined); if (e.target.value) clearMissing("odd"); }}
-                          className={cn(isMissing("odd") && "border-red-500")} />
-                      </FormControl>
+                      <div className="space-y-1.5">
+                        {oddInputs.map((val, i) => (
+                          <div key={i} className="flex gap-1 items-center">
+                            <Input type="number" step="0.01" placeholder="0.00"
+                              value={val}
+                              onChange={(e) => {
+                                const next = [...oddInputs]; next[i] = e.target.value; setOddInputs(next);
+                                if (e.target.value) clearMissing("odd");
+                              }}
+                              className={cn("flex-1 min-w-0", isMissing("odd") && i === 0 && !val && "border-red-500")}
+                            />
+                            {oddInputs.length > 1 && (
+                              <Button type="button" variant="ghost" size="icon" className="h-10 w-8 p-0 shrink-0"
+                                onClick={() => setOddInputs(prev => prev.filter((_, idx) => idx !== i))}>
+                                <X className="h-3 w-3" />
+                              </Button>
+                            )}
+                          </div>
+                        ))}
+                        <Button type="button" variant="ghost" size="sm" className="h-6 w-full text-xs px-1"
+                          onClick={() => setOddInputs(prev => [...prev, ""])}>
+                          + odd
+                        </Button>
+                        {oddInputs.filter(v => parseFloat(v) > 1).length > 1 && (
+                          <p className="text-xs text-muted-foreground">= <span className="font-medium text-foreground">{computedOdd.toFixed(2)}</span></p>
+                        )}
+                      </div>
                       <FormMessage />
                     </FormItem>
                   )} />
