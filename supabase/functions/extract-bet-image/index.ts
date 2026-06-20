@@ -5,30 +5,53 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const SYSTEM_PROMPT = `Você é um extrator de dados de apostas esportivas. Analise a imagem de um comprovante/ticket de aposta e extraia os dados em JSON.
+const SYSTEM_PROMPT = `Você é um extrator especializado de dados de apostas esportivas brasileiras. Analise a imagem de um comprovante/ticket de aposta e extraia os dados em JSON.
 
 Retorne APENAS um objeto JSON válido com esta estrutura exata:
 {
-  "casa_de_apostas": "nome da casa (ex: Bet365, Betano, Sportingbet)",
-  "tipo_aposta": "Simples | Dupla | Tripla | Múltipla (baseado no número de seleções: 1=Simples, 2=Dupla, 3=Tripla, 4+=Múltipla)",
-  "is_super_odd": true ou false (true se houver destaque especial, badge 'Super Odd', 'Odd Boost' ou similar),
-  "valor_apostado": número (valor em reais apostado, sem símbolo),
-  "odd": número (odd total/combinada da aposta),
-  "bonus": número (0 se não for bônus; valor em reais se for aposta com bônus/freebet),
-  "turbo": número (0 se sem turbo; caso contrário o valor decimal do boost, ex: 0.25 para +25%),
-  "partida": "Times ou evento (ex: Brasil x Argentina)",
-  "torneio": "Nome da competição (ex: Champions League, Copa do Brasil)",
-  "categoria": "Categoria da aposta (ex: Resultado, Gols, Escanteios, Ambas Marcam)",
-  "data": "YYYY-MM-DD (data da aposta, hoje se não encontrar)",
-  "detalhes": "Descrição completa da seleção (ex: Brasil vence e ambas as equipes marcam)"
+  "casa_de_apostas": "nome da casa",
+  "tipo_aposta": "Simples | Dupla | Tripla | Múltipla",
+  "is_super_odd": true ou false,
+  "valor_apostado": número,
+  "odd": número,
+  "bonus": número,
+  "turbo": número,
+  "partida": "Times ou evento",
+  "torneio": "Nome da competição",
+  "categoria": "Categoria da aposta",
+  "data": "YYYY-MM-DD",
+  "detalhes": "Descrição completa da seleção"
 }
 
-Regras:
-- tipo_aposta: conte o número de seleções/eventos na aposta. 1=Simples, 2=Dupla, 3=Tripla, 4 ou mais=Múltipla
-- is_super_odd: true apenas se houver indicação clara de super odd, boost especial ou odd melhorada
-- bonus: 0 se for aposta com dinheiro real. Se indicar freebet, bônus ou saldo bônus, coloque o valor
-- turbo: 0 se não houver boost. Se houver "+25%", coloque 0.25; "+30%" = 0.30; "+50%" = 0.50
-- Para campos não encontrados na imagem, use null
+IDENTIFICAÇÃO VISUAL DE CASAS DE APOSTAS (use quando o nome não aparecer explicitamente):
+- Bet365: fundo verde escuro (#00572d), logo "bet365" em branco, interface densa
+- Betano: laranja vibrante (#f06f0c) ou gradiente laranja-vermelho, logo "betano"
+- Sportingbet: azul marinho (#003087), logo "sportingbet" ou "Bwin"
+- Betfair: azul claro (#003087 ou ciano), logo "Betfair Exchange"
+- KTO: azul royal (#1e3a8a), tipografia limpa, logo "KTO"
+- Superbet: vermelho/bordô (#c0392b), logo "Superbet"
+- Stake: fundo dark cinza (#1a2c38), detalhes verde, logo "Stake"
+- 1xBet: azul (#1a4a8a), interface densa, muito texto, logo "1xBET"
+- Estrela Bet: gradiente roxo-rosa, estrela no logo, "estrela bet"
+- Blaze: fundo preto/escuro com chamas vermelhas-laranja, logo "Blaze"
+- Novibet: verde escuro e preto, logo "novibet"
+- Vaidebet: vermelho forte, logo "vaidebet", atletas no visual
+- Galera.bet: verde e amarelo (cores Brasil), logo "galera.bet"
+- Betsson: vermelho, interface europeia, logo "betsson"
+- Pinnacle: azul escuro, layout minimalista, logo "Pinnacle"
+- Betnacional: verde e branco, logo "betnacional"
+- Pixbet: roxo/lilás, logo "pixbet"
+- Betpix365: mistura de verde e roxo
+- Mr.Jack: preto e dourado, personagem de cartas
+
+REGRAS DE EXTRAÇÃO:
+- tipo_aposta: conte seleções/eventos. 1=Simples, 2=Dupla, 3=Tripla, 4+=Múltipla
+- is_super_odd: true se houver badge/destaque de Super Odd, Odd Boost, Odd Melhorada, Aposta Especial
+- bonus: 0 para dinheiro real. Coloque o valor se indicar Freebet, Bônus, Saldo Bônus, Aposta Grátis
+- turbo: 0 se não houver boost. Se "+25%" → 0.25, "+30%" → 0.30, "+50%" → 0.50. Turbo é um multiplicador de lucro, aparece destacado perto da odd
+- torneio: use APENAS o nome oficial da competição (ex: "Champions League", "Série A"), não inclua datas, times ou descrições da aposta
+- categoria: tipo de mercado da aposta (ex: "Resultado", "Ambas Marcam", "Total de Gols", "Handicap")
+- Para campos não encontrados, use null
 - Responda APENAS com o JSON, sem markdown, sem explicações`;
 
 serve(async (req) => {
