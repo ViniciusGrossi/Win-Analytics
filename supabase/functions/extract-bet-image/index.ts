@@ -5,7 +5,38 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const SYSTEM_PROMPT = `Você é um extrator especializado de dados de apostas esportivas brasileiras. Analise a imagem de um comprovante/ticket de aposta e extraia os dados em JSON.
+const VISUAL_PATTERNS = `IDENTIFICAÇÃO VISUAL DE CASAS DE APOSTAS:
+- Bet365: fundo verde escuro (#00572d), logo "bet365" em branco, interface densa
+- Betano: laranja vibrante (#f06f0c) ou gradiente laranja-vermelho, logo "betano"
+- Sportingbet: azul marinho (#003087), logo "sportingbet" ou "Bwin"
+- Betfair: azul claro ou ciano, logo "Betfair Exchange"
+- KTO: azul royal (#1e3a8a), tipografia limpa, logo "KTO"
+- Superbet: vermelho/bordô (#c0392b), logo "Superbet"
+- Stake: fundo dark cinza (#1a2c38), detalhes verde, logo "Stake"
+- 1xBet: azul (#1a4a8a), interface densa, muito texto, logo "1xBET"
+- Estrela Bet: gradiente roxo-rosa, estrela no logo
+- Blaze: fundo preto com chamas vermelhas-laranja, logo "Blaze"
+- Novibet: verde escuro e preto, logo "novibet"
+- Vaidebet: vermelho forte, logo "vaidebet"
+- Galera.bet: verde e amarelo (cores Brasil), logo "galera.bet"
+- Betsson: vermelho, interface europeia, logo "betsson"
+- Pinnacle: azul escuro, layout minimalista, logo "Pinnacle"
+- Betnacional: verde e branco, logo "betnacional"
+- Pixbet: roxo/lilás, logo "pixbet"
+- Mr.Jack: preto e dourado, personagem de cartas`;
+
+function buildPrompt(torneios: string[], casas: string[]): string {
+  const torneiosList = torneios.length > 0
+    ? `TORNEIOS DISPONÍVEIS NO SISTEMA (use exatamente um destes valores ou null se não corresponder a nenhum):
+${torneios.map(t => `  - "${t}"`).join("\n")}`
+    : "";
+
+  const casasList = casas.length > 0
+    ? `CASAS DE APOSTAS CADASTRADAS NO SISTEMA (use exatamente um destes nomes se identificar a casa, ou o nome que aparecer na imagem):
+${casas.map(c => `  - "${c}"`).join("\n")}`
+    : "";
+
+  return `Você é um extrator especializado de dados de apostas esportivas brasileiras. Analise a imagem de um comprovante/ticket de aposta e extraia os dados em JSON.
 
 Retorne APENAS um objeto JSON válido com esta estrutura exata:
 {
@@ -17,42 +48,29 @@ Retorne APENAS um objeto JSON válido com esta estrutura exata:
   "bonus": número,
   "turbo": número,
   "partida": "Times ou evento",
-  "torneio": "Nome da competição",
+  "torneio": "Nome exato da competição conforme lista do sistema",
   "categoria": "Categoria da aposta",
   "data": "YYYY-MM-DD",
   "detalhes": "Descrição completa da seleção"
 }
 
-IDENTIFICAÇÃO VISUAL DE CASAS DE APOSTAS (use quando o nome não aparecer explicitamente):
-- Bet365: fundo verde escuro (#00572d), logo "bet365" em branco, interface densa
-- Betano: laranja vibrante (#f06f0c) ou gradiente laranja-vermelho, logo "betano"
-- Sportingbet: azul marinho (#003087), logo "sportingbet" ou "Bwin"
-- Betfair: azul claro (#003087 ou ciano), logo "Betfair Exchange"
-- KTO: azul royal (#1e3a8a), tipografia limpa, logo "KTO"
-- Superbet: vermelho/bordô (#c0392b), logo "Superbet"
-- Stake: fundo dark cinza (#1a2c38), detalhes verde, logo "Stake"
-- 1xBet: azul (#1a4a8a), interface densa, muito texto, logo "1xBET"
-- Estrela Bet: gradiente roxo-rosa, estrela no logo, "estrela bet"
-- Blaze: fundo preto/escuro com chamas vermelhas-laranja, logo "Blaze"
-- Novibet: verde escuro e preto, logo "novibet"
-- Vaidebet: vermelho forte, logo "vaidebet", atletas no visual
-- Galera.bet: verde e amarelo (cores Brasil), logo "galera.bet"
-- Betsson: vermelho, interface europeia, logo "betsson"
-- Pinnacle: azul escuro, layout minimalista, logo "Pinnacle"
-- Betnacional: verde e branco, logo "betnacional"
-- Pixbet: roxo/lilás, logo "pixbet"
-- Betpix365: mistura de verde e roxo
-- Mr.Jack: preto e dourado, personagem de cartas
+${torneiosList}
+
+${casasList}
+
+${VISUAL_PATTERNS}
 
 REGRAS DE EXTRAÇÃO:
 - tipo_aposta: conte seleções/eventos. 1=Simples, 2=Dupla, 3=Tripla, 4+=Múltipla
+- torneio: OBRIGATÓRIO usar um dos valores da lista acima se a competição corresponder. Ex: se vir "English Premier League", "EPL", "PL" → use "Premier League". Se vir "UEFA Champions League" → use "Champions League". Se não corresponder a nenhum da lista, retorne null
+- casa_de_apostas: se a casa estiver na lista cadastrada, use o nome EXATO da lista. Se não estiver, use o nome que aparecer na imagem ou identifique pelos padrões visuais abaixo
 - is_super_odd: true se houver badge/destaque de Super Odd, Odd Boost, Odd Melhorada, Aposta Especial
-- bonus: 0 para dinheiro real. Coloque o valor se indicar Freebet, Bônus, Saldo Bônus, Aposta Grátis
-- turbo: 0 se não houver boost. Se "+25%" → 0.25, "+30%" → 0.30, "+50%" → 0.50. Turbo é um multiplicador de lucro, aparece destacado perto da odd
-- torneio: use APENAS o nome oficial da competição (ex: "Champions League", "Série A"), não inclua datas, times ou descrições da aposta
-- categoria: tipo de mercado da aposta (ex: "Resultado", "Ambas Marcam", "Total de Gols", "Handicap")
+- bonus: 0 para dinheiro real. Valor se indicar Freebet, Bônus, Saldo Bônus, Aposta Grátis
+- turbo: 0 se não houver boost. "+25%" → 0.25, "+30%" → 0.30, "+50%" → 0.50
+- categoria: tipo de mercado (ex: "Resultado", "Ambas Marcam", "Total de Gols", "Handicap", "Chutes ao Gol")
 - Para campos não encontrados, use null
 - Responda APENAS com o JSON, sem markdown, sem explicações`;
+}
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -65,11 +83,13 @@ serve(async (req) => {
       throw new Error("NVIDIA_API_KEY não configurada");
     }
 
-    const { imageBase64, mimeType = "image/jpeg" } = await req.json();
+    const { imageBase64, mimeType = "image/jpeg", torneios = [], casas = [] } = await req.json();
 
     if (!imageBase64) {
       throw new Error("imageBase64 é obrigatório");
     }
+
+    const systemPrompt = buildPrompt(torneios as string[], casas as string[]);
 
     const response = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
       method: "POST",
@@ -82,7 +102,7 @@ serve(async (req) => {
         messages: [
           {
             role: "system",
-            content: SYSTEM_PROMPT,
+            content: systemPrompt,
           },
           {
             role: "user",

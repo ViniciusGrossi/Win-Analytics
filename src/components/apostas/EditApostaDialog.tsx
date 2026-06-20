@@ -18,6 +18,7 @@ import { bookiesService } from "@/services/bookies";
 import { apostasService } from "@/services/apostas";
 import type { Bookie, Aposta, ApostaFormData } from "@/types/betting";
 import { formatCurrency, cn } from "@/lib/utils";
+import { TORNEIOS, TIPOS_APOSTA, TURBO_OPTIONS } from "@/lib/apostas-constants";
 import { CalendarIcon, Wallet, Zap, Gift, Info, Edit, Trash2, AlertTriangle, X, Check, ChevronsUpDown, Star } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -61,43 +62,9 @@ const categorias = [
   "Outros",
 ];
 
-const tiposAposta = ["Simples", "Dupla", "Tripla", "Múltipla"];
-
-const torneios = [
-  "Brasileirao Serie A",
-  "Brasileirao Serie B",
-  "Champions League",
-  "Europa League",
-  "Conference League",
-  "Copa do Mundo FIFA",
-  "Premier League",
-  "La Liga",
-  "Bundesliga",
-  "Serie A Italia",
-  "Ligue 1",
-  "Copa do Brasil",
-  "Copa Libertadores",
-  "Copa Sul-Americana",
-  "Liga Portugal",
-  "Campeonatos Estaduais",
-  "Data Fifa",
-  "Championship",
-  "FA Cup",
-  "Carabao Cup",
-  "Copa do Rei",
-  "Copa da Alemanha",
-  "Coppa Italia",
-  "Copa da França",
-  "Saudi Pro League",
-  "Süper Lig (Turquia)",
-];
-
-const turboOptions = [
-  { label: "Sem Turbo", value: 0 },
-  { label: "+25%", value: 0.25 },
-  { label: "+30%", value: 0.30 },
-  { label: "+50%", value: 0.50 },
-];
+const tiposAposta = [...TIPOS_APOSTA];
+const torneios = [...TORNEIOS];
+const turboOptions = [...TURBO_OPTIONS];
 
 interface EditApostaDialogProps {
   open: boolean;

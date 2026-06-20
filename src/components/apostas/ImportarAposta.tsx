@@ -19,17 +19,13 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
+import { TORNEIOS, TIPOS_APOSTA, TURBO_OPTIONS } from "@/lib/apostas-constants";
 
 const SUPABASE_URL = "https://cjlvcjfuntfbdrrkigwh.supabase.co";
 
-const STATIC_TIPOS = ["Simples", "Dupla", "Tripla", "Múltipla"];
+const STATIC_TIPOS = [...TIPOS_APOSTA];
 
-const turboOptions = [
-  { label: "Sem Turbo", value: 0 },
-  { label: "+25%", value: 0.25 },
-  { label: "+30%", value: 0.30 },
-  { label: "+50%", value: 0.50 },
-];
+const turboOptions = [...TURBO_OPTIONS];
 
 const formSchema = z.object({
   casa_de_apostas: z.string().min(1, "Casa é obrigatória"),
@@ -161,7 +157,12 @@ export function ImportarAposta({ onSuccess, sharedImage }: ImportarApostaProps) 
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
           apikey: import.meta.env.VITE_SUPABASE_ANON_KEY || "",
         },
-        body: JSON.stringify({ imageBase64: base64, mimeType: imageFile.type }),
+        body: JSON.stringify({
+          imageBase64: base64,
+          mimeType: imageFile.type,
+          torneios: [...TORNEIOS],
+          casas: bookies.map(b => b.name),
+        }),
       });
 
       const result = await response.json();
