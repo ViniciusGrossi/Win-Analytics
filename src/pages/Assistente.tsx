@@ -6,7 +6,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Bot, Send, Sparkles, TrendingUp, Target, AlertCircle,
   Copy, Check, Trash2, BarChart3, Brain, Lightbulb,
-  TrendingDown, DollarSign, Activity
+  TrendingDown, DollarSign, Activity, Zap
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
@@ -41,6 +41,7 @@ export default function Assistente() {
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [modelMode, setModelMode] = useState<"fast" | "deep">("fast");
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const suggestionCategories = [
@@ -114,6 +115,7 @@ export default function Assistente() {
         body: {
           message: userMessage.content,
           history,
+          modelMode,
         },
       });
 
@@ -173,6 +175,29 @@ export default function Assistente() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {/* Model toggle */}
+          <div className="flex items-center rounded-lg border bg-muted p-0.5 gap-0.5">
+            <Button
+              variant={modelMode === "fast" ? "default" : "ghost"}
+              size="sm"
+              className="h-7 px-2.5 text-xs gap-1.5"
+              onClick={() => setModelMode("fast")}
+              title="Llama 3.3 70B — respostas rápidas"
+            >
+              <Zap className="h-3 w-3" />
+              Rápido
+            </Button>
+            <Button
+              variant={modelMode === "deep" ? "default" : "ghost"}
+              size="sm"
+              className="h-7 px-2.5 text-xs gap-1.5"
+              onClick={() => setModelMode("deep")}
+              title="Nemotron 550B — análise profunda com raciocínio"
+            >
+              <Brain className="h-3 w-3" />
+              Profundo
+            </Button>
+          </div>
           <Badge variant="outline" className="hidden md:flex gap-1">
             <Activity className="h-3 w-3" />
             {messages.length} mensagens
@@ -285,7 +310,9 @@ export default function Assistente() {
                         <motion.div className="w-2 h-2 rounded-full bg-primary" animate={{ y: [0, -8, 0] }} transition={{ repeat: Infinity, duration: 0.6, delay: 0.1 }} />
                         <motion.div className="w-2 h-2 rounded-full bg-primary" animate={{ y: [0, -8, 0] }} transition={{ repeat: Infinity, duration: 0.6, delay: 0.2 }} />
                       </div>
-                      <span className="text-sm text-muted-foreground">Pensando...</span>
+                      <span className="text-sm text-muted-foreground">
+                        {modelMode === "deep" ? "Raciocínio profundo..." : "Pensando..."}
+                      </span>
                     </div>
                   </div>
                 </motion.div>

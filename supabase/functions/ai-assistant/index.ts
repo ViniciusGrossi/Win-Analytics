@@ -233,7 +233,7 @@ serve(async (req) => {
   }
 
   try {
-    const { message, history = [] } = await req.json();
+    const { message, history = [], modelMode = "fast" } = await req.json();
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
     const supabaseKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
@@ -282,21 +282,29 @@ FORMATO OBRIGATÓRIO (JSON puro, sem markdown ao redor):
       { role: "user", content: message },
     ];
 
+    const modelConfig = modelMode === "deep"
+      ? {
+          model: "nvidia/nemotron-3-ultra-550b-a55b",
+          max_tokens: 16384,
+          temperature: 1,
+          top_p: 0.95,
+          chat_template_kwargs: { enable_thinking: true },
+          reasoning_budget: 16384,
+        }
+      : {
+          model: "meta/llama-3.3-70b-instruct",
+          max_tokens: 1024,
+          temperature: 0.2,
+          top_p: 0.7,
+        };
+
     const response = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${nvidiaApiKey}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        model: "nvidia/nemotron-3-ultra-550b-a55b",
-        messages,
-        max_tokens: 16384,
-        temperature: 1,
-        top_p: 0.95,
-        chat_template_kwargs: { enable_thinking: true },
-        reasoning_budget: 16384,
-      }),
+      body: JSON.stringify({ messages, ...modelConfig }),
     });
 
     if (!response.ok) {
