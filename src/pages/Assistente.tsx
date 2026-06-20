@@ -104,10 +104,16 @@ export default function Assistente() {
     setIsLoading(true);
 
     try {
+      // Build conversation history for context (exclude initial greeting, last 8 turns)
+      const history = messages
+        .filter(m => m.id !== "1")
+        .slice(-8)
+        .map(m => ({ role: m.role, content: m.content }));
+
       const { data, error } = await supabase.functions.invoke('ai-assistant', {
-        body: { 
+        body: {
           message: userMessage.content,
-          user_id: user.id 
+          history,
         },
       });
 
