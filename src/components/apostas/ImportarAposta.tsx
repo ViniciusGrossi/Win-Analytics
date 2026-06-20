@@ -162,6 +162,7 @@ export function ImportarAposta({ onSuccess, sharedImage }: ImportarApostaProps) 
           mimeType: imageFile.type,
           torneios: [...TORNEIOS],
           casas: bookies.map(b => b.name),
+          currentDate: format(new Date(), "yyyy-MM-dd"),
         }),
       });
 
@@ -177,8 +178,8 @@ export function ImportarAposta({ onSuccess, sharedImage }: ImportarApostaProps) 
       });
       setMissingFields(missing);
 
-      // Normaliza tipo_aposta para os valores canônicos
       const tipoNorm = normalizeTipo(data.tipo_aposta);
+      const torneioNorm = normalizeTorneio(data.torneio);
 
       form.reset({
         casa_de_apostas: data.casa_de_apostas || "",
@@ -189,7 +190,7 @@ export function ImportarAposta({ onSuccess, sharedImage }: ImportarApostaProps) 
         turbo: data.turbo ?? 0,
         is_super_odd: data.is_super_odd ?? false,
         partida: data.partida || "",
-        torneio: data.torneio || "",
+        torneio: torneioNorm,
         categoria: data.categoria || "",
         data: data.data || format(new Date(), "yyyy-MM-dd"),
         detalhes: data.detalhes || "",
@@ -251,8 +252,8 @@ export function ImportarAposta({ onSuccess, sharedImage }: ImportarApostaProps) 
     setHasBonus(false);
   };
 
-  // Opções de tipo: estáticos + existentes sem duplicatas
   const tiposOptions = [...new Set([...STATIC_TIPOS, ...existingTipos])];
+  const torneiosOptions = [...new Set([...TORNEIOS, ...existingTorneios])];
 
   const isMissing = (field: string) => missingFields.has(field);
   const clearMissing = (field: string) => setMissingFields(s => { const n = new Set(s); n.delete(field); return n; });
@@ -473,14 +474,21 @@ export function ImportarAposta({ onSuccess, sharedImage }: ImportarApostaProps) 
                   </FormItem>
                 )} />
 
-                {/* Torneio + Categoria — com datalist de valores existentes */}
+                {/* Torneio + Categoria */}
                 <div className="grid grid-cols-2 gap-3">
                   <FormField control={form.control} name="torneio" render={({ field }) => (
                     <FormItem>
                       <FormLabel>Torneio</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Ex: Champions League" list="dl-torneios" {...field} />
-                      </FormControl>
+                      <Select value={field.value || ""} onValueChange={field.onChange}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione..." />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent className="max-h-60 overflow-y-auto [touch-action:pan-y]">
+                          {torneiosOptions.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
                     </FormItem>
                   )} />
 
@@ -579,4 +587,46 @@ function normalizeTipo(raw: string | null): string {
   if (lower.includes("tripla") || lower === "3") return "Tripla";
   if (lower.includes("múltipla") || lower.includes("multipla") || lower.includes("multi") || parseInt(lower) >= 4) return "Múltipla";
   return raw;
+}
+
+function normalizeTorneio(raw: string | null): string {
+  if (!raw) return "";
+  const lower = raw.toLowerCase().trim();
+
+  // TURBINACO é produto da Betnacional, não é torneio — ignorar
+  if (lower.startsWith("turbinaco")) return "";
+
+  // Exact match (case-insensitive)
+  const exact = TORNEIOS.find(t => t.toLowerCase() === lower);
+  if (exact) return exact;
+
+  if (lower.includes("premier") || lower === "epl" || lower === "pl") return "Premier League";
+  if (lower.includes("champions")) return "Champions League";
+  if (lower.includes("europa league")) return "Europa League";
+  if (lower.includes("conference")) return "Conference League";
+  if (lower.includes("brasileirao") && (lower.includes("serie a") || lower.includes("série a"))) return "Brasileirao Serie A";
+  if (lower.includes("brasileirao") && (lower.includes("serie b") || lower.includes("série b"))) return "Brasileirao Serie B";
+  if (lower.includes("libertadores")) return "Copa Libertadores";
+  if (lower.includes("sul-americana") || lower.includes("sudamericana")) return "Copa Sul-Americana";
+  if (lower.includes("copa do brasil")) return "Copa do Brasil";
+  if (lower.includes("bundesliga")) return "Bundesliga";
+  if (lower.includes("la liga") || lower.includes("laliga")) return "La Liga";
+  if (lower.includes("ligue 1")) return "Ligue 1";
+  if ((lower.includes("serie a") || lower.includes("série a")) && (lower.includes("ital") || lower.includes("it"))) return "Serie A Italia";
+  if (lower.includes("copa do mundo") || lower.includes("world cup") || lower.includes("fifa world")) return "Copa do Mundo FIFA";
+  if (lower.includes("fa cup")) return "FA Cup";
+  if (lower.includes("carabao")) return "Carabao Cup";
+  if (lower.includes("championship")) return "Championship";
+  if (lower.includes("liga portugal") || lower.includes("primeira liga")) return "Liga Portugal";
+  if (lower.includes("saudi") || lower.includes("roshn")) return "Saudi Pro League";
+  if (lower.includes("super lig") || lower.includes("süper lig") || lower.includes("turquia")) return "Süper Lig (Turquia)";
+  if (lower.includes("copa do rei") || lower.includes("copa del rey")) return "Copa do Rei";
+  if (lower.includes("dfb") || lower.includes("pokal") || lower.includes("copa da alemanha")) return "Copa da Alemanha";
+  if (lower.includes("coppa italia")) return "Coppa Italia";
+  if (lower.includes("coupe de france") || lower.includes("copa da fran")) return "Copa da França";
+  if (lower.includes("estadual")) return "Campeonatos Estaduais";
+  if (lower.includes("nations league") || lower.includes("data fifa") || lower.includes("international")) return "Data Fifa";
+
+  // Sem correspondência → usuário seleciona manualmente
+  return "";
 }

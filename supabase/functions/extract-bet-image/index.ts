@@ -21,11 +21,12 @@ const VISUAL_PATTERNS = `IDENTIFICAÇÃO VISUAL DE CASAS DE APOSTAS:
 - Galera.bet: verde e amarelo (cores Brasil), logo "galera.bet"
 - Betsson: vermelho, interface europeia, logo "betsson"
 - Pinnacle: azul escuro, layout minimalista, logo "Pinnacle"
-- Betnacional: verde e branco, logo "betnacional"
+- Betnacional: verde e branco, logo "betnacional" ou "betnacional.com.br"; produto TURBINACO = aposta curada da Betnacional; eventos com prefixo "(BN)" = Betnacional
 - Pixbet: roxo/lilás, logo "pixbet"
 - Mr.Jack: preto e dourado, personagem de cartas`;
 
-function buildPrompt(torneios: string[], casas: string[]): string {
+function buildPrompt(torneios: string[], casas: string[], currentDate: string): string {
+  const currentYear = currentDate.split("-")[0];
   const torneiosList = torneios.length > 0
     ? `TORNEIOS DISPONÍVEIS NO SISTEMA (use exatamente um destes valores ou null se não corresponder a nenhum):
 ${torneios.map(t => `  - "${t}"`).join("\n")}`
@@ -60,11 +61,14 @@ ${casasList}
 
 ${VISUAL_PATTERNS}
 
+DATA ATUAL DO SISTEMA: ${currentDate} (ano ${currentYear})
+
 REGRAS DE EXTRAÇÃO:
 - tipo_aposta: conte seleções/eventos. 1=Simples, 2=Dupla, 3=Tripla, 4+=Múltipla
-- torneio: OBRIGATÓRIO usar um dos valores da lista acima se a competição corresponder. Ex: se vir "English Premier League", "EPL", "PL" → use "Premier League". Se vir "UEFA Champions League" → use "Champions League". Se não corresponder a nenhum da lista, retorne null
-- casa_de_apostas: se a casa estiver na lista cadastrada, use o nome EXATO da lista. Se não estiver, use o nome que aparecer na imagem ou identifique pelos padrões visuais abaixo
-- is_super_odd: true se houver badge/destaque de Super Odd, Odd Boost, Odd Melhorada, Aposta Especial
+- torneio: OBRIGATÓRIO usar um dos valores da lista acima se a competição corresponder. Ex: "English Premier League"/"EPL"/"PL" → "Premier League". "UEFA Champions League" → "Champions League". TURBINACO não é torneio — é um produto da Betnacional; extraia a competição real ou retorne null. Se não corresponder a nenhum da lista, retorne null
+- casa_de_apostas: se a casa estiver na lista cadastrada, use o nome EXATO da lista. Se não estiver, use o nome que aparecer na imagem ou identifique pelos padrões visuais. TURBINACO e eventos com "(BN)" indicam Betnacional
+- data: extraia dia e mês da imagem. Para o ANO, use SEMPRE ${currentYear} exceto se um ano diferente estiver claramente impresso na imagem E fizer sentido (ex: aposta futura). Se só vir "HH:MM" ou "DD/MM" sem ano, use ${currentYear}
+- is_super_odd: true se houver badge/destaque de Super Odd, Odd Boost, Odd Melhorada, Aposta Especial, ou prefixo TURBINACO (produto de Super Odds da Betnacional)
 - bonus: 0 para dinheiro real. Valor se indicar Freebet, Bônus, Saldo Bônus, Aposta Grátis
 - turbo: 0 se não houver boost. "+25%" → 0.25, "+30%" → 0.30, "+50%" → 0.50
 - categoria: tipo de mercado (ex: "Resultado", "Ambas Marcam", "Total de Gols", "Handicap", "Chutes ao Gol")
@@ -83,13 +87,14 @@ serve(async (req) => {
       throw new Error("NVIDIA_API_KEY não configurada");
     }
 
-    const { imageBase64, mimeType = "image/jpeg", torneios = [], casas = [] } = await req.json();
+    const { imageBase64, mimeType = "image/jpeg", torneios = [], casas = [], currentDate } = await req.json();
 
     if (!imageBase64) {
       throw new Error("imageBase64 é obrigatório");
     }
 
-    const systemPrompt = buildPrompt(torneios as string[], casas as string[]);
+    const today = currentDate || new Date().toISOString().split("T")[0];
+    const systemPrompt = buildPrompt(torneios as string[], casas as string[], today);
 
     const response = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
       method: "POST",

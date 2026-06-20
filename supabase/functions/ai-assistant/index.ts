@@ -175,7 +175,7 @@ function computeAnalytics(bets: Bet[], bookies: { name: string; balance: number 
   }
 
   // Last 25 bets for recent context
-  const recent = bets.slice(0, 25).map(b => ({
+  const recent = bets.slice(0, 50).map(b => ({
     data: b.data, partida: b.partida, tipo: b.tipo_aposta, categoria: b.categoria,
     torneio: b.torneio, casa: b.casa_de_apostas, valor: b.valor_apostado,
     odd: b.odd, resultado: b.resultado, lucro: betLucro(b).toFixed(2),
