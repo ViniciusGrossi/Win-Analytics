@@ -85,6 +85,7 @@ export function ImportarAposta({ onSuccess, sharedImage }: ImportarApostaProps) 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [oddInputs, setOddInputs] = useState<string[]>([""])
   const [categorySearch, setCategorySearch] = useState("");
+  const [selectedModel, setSelectedModel] = useState<"auto" | "90b" | "11b">("auto");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const computedOdd = oddInputs.reduce((acc, v) => {
@@ -176,6 +177,7 @@ export function ImportarAposta({ onSuccess, sharedImage }: ImportarApostaProps) 
           torneios: [...TORNEIOS],
           casas: bookies.map(b => b.name),
           currentDate: format(new Date(), "yyyy-MM-dd"),
+          ...(selectedModel !== "auto" ? { model: selectedModel } : {}),
         }),
       });
 
@@ -328,9 +330,28 @@ export function ImportarAposta({ onSuccess, sharedImage }: ImportarApostaProps) 
               onChange={(e) => { if (e.target.files?.[0]) handleFile(e.target.files[0]); }} />
 
             {imagePreview && (
-              <Button onClick={handleExtract} className="w-full" size="lg">
-                <Zap className="h-4 w-4 mr-2" /> Extrair Dados da Aposta
-              </Button>
+              <div className="space-y-2">
+                <div className="flex gap-1.5 justify-center">
+                  {(["auto", "90b", "11b"] as const).map((m) => (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => setSelectedModel(m)}
+                      className={cn(
+                        "px-3 py-1 rounded-full text-xs font-medium border transition-all",
+                        selectedModel === m
+                          ? "bg-primary text-primary-foreground border-primary"
+                          : "bg-background text-muted-foreground border-border hover:border-primary/50"
+                      )}
+                    >
+                      {m === "auto" ? "⚡ Auto" : m === "90b" ? "🎯 90B (preciso)" : "🚀 11B (rápido)"}
+                    </button>
+                  ))}
+                </div>
+                <Button onClick={handleExtract} className="w-full" size="lg">
+                  <Zap className="h-4 w-4 mr-2" /> Extrair Dados da Aposta
+                </Button>
+              </div>
             )}
           </motion.div>
         )}

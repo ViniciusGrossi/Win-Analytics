@@ -77,6 +77,39 @@ REGRAS DE EXTRAÇÃO:
 - Responda APENAS com o JSON, sem markdown, sem explicações`;
 }
 
+const MODELS = {
+  "90b": "meta/llama-3.2-90b-vision-instruct",
+  "11b": "meta/llama-3.2-11b-vision-instruct",
+} as const;
+
+async function callNvidia(
+  model: string,
+  systemPrompt: string,
+  imageBase64: string,
+  mimeType: string,
+  apiKey: string,
+) {
+  return fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
+    method: "POST",
+    headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model,
+      messages: [
+        { role: "system", content: systemPrompt },
+        {
+          role: "user",
+          content: [
+            { type: "image_url", image_url: { url: `data:${mimeType};base64,${imageBase64}` } },
+            { type: "text", text: "Extraia os dados desta aposta esportiva e retorne o JSON." },
+          ],
+        },
+      ],
+      max_tokens: 1024,
+      temperature: 0.1,
+    }),
+  });
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -84,73 +117,50 @@ serve(async (req) => {
 
   try {
     const nvidiaApiKey = Deno.env.get("NVIDIA_API_KEY");
-    if (!nvidiaApiKey) {
-      throw new Error("NVIDIA_API_KEY não configurada");
-    }
+    if (!nvidiaApiKey) throw new Error("NVIDIA_API_KEY não configurada");
 
-    const { imageBase64, mimeType = "image/jpeg", torneios = [], casas = [], currentDate } = await req.json();
-
-    if (!imageBase64) {
-      throw new Error("imageBase64 é obrigatório");
-    }
+    const { imageBase64, mimeType = "image/jpeg", torneios = [], casas = [], currentDate, model } = await req.json();
+    if (!imageBase64) throw new Error("imageBase64 é obrigatório");
 
     const today = currentDate || new Date().toISOString().split("T")[0];
     const systemPrompt = buildPrompt(torneios as string[], casas as string[], today);
 
-    const response = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${nvidiaApiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "meta/llama-3.2-90b-vision-instruct",
-        messages: [
-          {
-            role: "system",
-            content: systemPrompt,
-          },
-          {
-            role: "user",
-            content: [
-              {
-                type: "image_url",
-                image_url: {
-                  url: `data:${mimeType};base64,${imageBase64}`,
-                },
-              },
-              {
-                type: "text",
-                text: "Extraia os dados desta aposta esportiva e retorne o JSON.",
-              },
-            ],
-          },
-        ],
-        max_tokens: 1024,
-        temperature: 0.1,
-      }),
-    });
+    // Se usuário escolheu modelo específico, usa direto; senão auto com fallback
+    const modelsToTry: string[] = model
+      ? [model === "11b" ? MODELS["11b"] : MODELS["90b"]]
+      : [MODELS["90b"], MODELS["11b"]];
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`NVIDIA API error ${response.status}: ${errorText}`);
+    let lastError = "";
+    let usedModel = "";
+
+    for (const m of modelsToTry) {
+      const response = await callNvidia(m, systemPrompt, imageBase64, mimeType, nvidiaApiKey);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        lastError = `${m} → ${response.status}: ${errorText}`;
+        continue;
+      }
+
+      const nvidiaData = await response.json();
+      const rawContent = nvidiaData.choices?.[0]?.message?.content ?? "";
+
+      const jsonMatch = rawContent.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        lastError = `${m} → JSON inválido: ${rawContent.slice(0, 200)}`;
+        continue;
+      }
+
+      const extracted = JSON.parse(jsonMatch[0]);
+      usedModel = m;
+
+      return new Response(JSON.stringify({ data: extracted, raw: rawContent, model: usedModel }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200,
+      });
     }
 
-    const nvidiaData = await response.json();
-    const rawContent = nvidiaData.choices?.[0]?.message?.content ?? "";
-
-    // Extrai JSON da resposta (remove possível markdown)
-    const jsonMatch = rawContent.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      throw new Error("Modelo não retornou JSON válido");
-    }
-
-    const extracted = JSON.parse(jsonMatch[0]);
-
-    return new Response(JSON.stringify({ data: extracted, raw: rawContent }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 200,
-    });
+    throw new Error(`Todos os modelos falharam. Último erro: ${lastError}`);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     return new Response(JSON.stringify({ error: message }), {
