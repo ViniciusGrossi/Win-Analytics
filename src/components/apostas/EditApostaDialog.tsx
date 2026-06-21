@@ -289,9 +289,8 @@ export function EditApostaDialog({ open, onOpenChange, aposta, onSuccess }: Edit
                                 overscrollBehavior: 'contain',
                                 minHeight: 0
                               } as React.CSSProperties}
-                              onWheel={(e) => {
-                                e.stopPropagation();
-                              }}
+                              onWheel={(e) => e.stopPropagation()}
+                              onTouchMove={(e) => e.stopPropagation()}
                             >
                               {filteredCategorias.length === 0 ? (
                                 <div className="py-6 text-center text-sm text-muted-foreground">
@@ -450,9 +449,8 @@ export function EditApostaDialog({ open, onOpenChange, aposta, onSuccess }: Edit
                             overscrollBehavior: 'contain',
                             minHeight: 0
                           } as React.CSSProperties}
-                          onWheel={(e) => {
-                            e.stopPropagation();
-                          }}
+                          onWheel={(e) => e.stopPropagation()}
+                          onTouchMove={(e) => e.stopPropagation()}
                         >
                           {(() => {
                             const filteredBookies = bookies.filter((bookie) =>
@@ -565,9 +563,8 @@ export function EditApostaDialog({ open, onOpenChange, aposta, onSuccess }: Edit
                               overscrollBehavior: 'contain',
                               minHeight: 0
                             } as React.CSSProperties}
-                            onWheel={(e) => {
-                              e.stopPropagation();
-                            }}
+                            onWheel={(e) => e.stopPropagation()}
+                            onTouchMove={(e) => e.stopPropagation()}
                           >
                             {(() => {
                               const filteredTournaments = torneios.filter((torneio) =>
