@@ -5,25 +5,24 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const VISUAL_PATTERNS = `IDENTIFICAÇÃO VISUAL DE CASAS DE APOSTAS:
-- Bet365: fundo verde escuro (#00572d), logo "bet365" em branco, interface densa
-- Betano: laranja vibrante (#f06f0c) ou gradiente laranja-vermelho, logo "betano"
-- Sportingbet: azul marinho (#003087), logo "sportingbet" ou "Bwin"
-- Betfair: azul claro ou ciano, logo "Betfair Exchange"
-- KTO: azul royal (#1e3a8a), tipografia limpa, logo "KTO"
-- Superbet: vermelho/bordô (#c0392b), logo "Superbet"
+const VISUAL_PATTERNS = `IDENTIFICAÇÃO VISUAL DE CASAS DE APOSTAS (suas casas cadastradas em destaque):
+
+CASAS CADASTRADAS NO SISTEMA (prioridade máxima na identificação):
+- Bet 365: fundo #121313 (quase preto), elementos e destaques em verde escuro (#00572d), logo "bet365" em branco. Interface densa com muitas odds em colunas
+- Betano: fundo branco ou escuro com laranja vibrante #FF3C07 como cor primária, logo "betano" em laranja, botões laranja com texto branco
+- Betfair: fundo #1E1E1E (escuro), destaques em amarelo dourado #FFB80C, logo "Betfair" ou "Betfair Exchange" em amarelo. Layout de exchange com back/lay
+- Bet MGM: fundo #1C1D20 (escuro), detalhes dour/champanhe #BDA679, logo "BetMGM" com leão MGM. Interface premium minimalista
+- Betnacional: fundo azul marinho profundo #0B1429 e #13213C, shades em #2E323D, logo "betnacional" ou "betnacional.com.br" em branco. Produto TURBINACO = aposta especial da Betnacional. Eventos com prefixo "(BN)" = Betnacional
+- KTO: fundo preto #000000 com vermelho vivo #DA0006 como cor de destaque, logo "KTO" em vermelho e branco. Tipografia limpa e moderna
+- Sporting Bet: fundo branco #FFFFFF com azul #035C8E como cor primária, logo "sportingbet" em azul. Interface clara e limpa
+
+OUTRAS CASAS COMUNS (caso apareçam em prints):
 - Stake: fundo dark cinza (#1a2c38), detalhes verde, logo "Stake"
 - 1xBet: azul (#1a4a8a), interface densa, muito texto, logo "1xBET"
 - Estrela Bet: gradiente roxo-rosa, estrela no logo
 - Blaze: fundo preto com chamas vermelhas-laranja, logo "Blaze"
-- Novibet: verde escuro e preto, logo "novibet"
-- Vaidebet: vermelho forte, logo "vaidebet"
-- Galera.bet: verde e amarelo (cores Brasil), logo "galera.bet"
-- Betsson: vermelho, interface europeia, logo "betsson"
-- Pinnacle: azul escuro, layout minimalista, logo "Pinnacle"
-- Betnacional: verde e branco, logo "betnacional" ou "betnacional.com.br"; produto TURBINACO = aposta curada da Betnacional; eventos com prefixo "(BN)" = Betnacional
-- Pixbet: roxo/lilás, logo "pixbet"
-- Mr.Jack: preto e dourado, personagem de cartas`;
+- Superbet: vermelho/bordô (#c0392b), logo "Superbet"
+- Pixbet: roxo/lilás, logo "pixbet"`;
 
 function buildPrompt(torneios: string[], casas: string[], currentDate: string): string {
   const currentYear = currentDate.split("-")[0];
