@@ -50,7 +50,7 @@ Retorne APENAS um objeto JSON válido com esta estrutura exata:
   "turbo": número,
   "partida": "Times ou evento",
   "torneio": "Nome exato da competição conforme lista do sistema",
-  "categoria": "Categoria da aposta",
+  "categoria": ["Categoria1", "Categoria2"],
   "data": "YYYY-MM-DD",
   "detalhes": "Descrição completa da seleção"
 }
@@ -73,7 +73,7 @@ REGRAS DE EXTRAÇÃO:
 - is_super_odd: true se houver badge/destaque de Super Odd, Odd Boost, Odd Melhorada, Aposta Especial, ou prefixo TURBINACO (produto de Super Odds da Betnacional)
 - bonus: 0 para dinheiro real. Valor se indicar Freebet, Bônus, Saldo Bônus, Aposta Grátis
 - turbo: 0 se não houver boost. "+25%" → 0.25, "+30%" → 0.30, "+50%" → 0.50
-- categoria: tipo de mercado (ex: "Resultado", "Ambas Marcam", "Total de Gols", "Handicap", "Chutes ao Gol na Partida")
+- categoria: array com TODAS as categorias da aposta, usando APENAS valores da lista: ["Resultado","Finalizacoes","Escanteios","HT","FT","Gols","Chance Dupla","Chutes ao Gol","Ambas Marcam","Sofrer Falta","Cometer Falta","Cartoes","Defesas","Tiros livres","Tiros de Meta","Laterais","Desarmes","Impedimentos","Handicap","Outros"]. Ex: combinada "Ambas Marcam + Mais de 2 Gols" → ["Ambas Marcam","Gols"]. Se não corresponder a nenhum, retorne ["Outros"]. NUNCA retorne string, sempre array
 - Para campos não encontrados, use null
 - Responda APENAS com o JSON, sem markdown, sem explicações`;
 }

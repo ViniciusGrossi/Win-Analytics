@@ -16,7 +16,7 @@ import { bookiesService } from "@/services/bookies";
 import { apostasService } from "@/services/apostas";
 import type { Bookie, ApostaFormData } from "@/types/betting";
 import { formatCurrency, cn } from "@/lib/utils";
-import { TORNEIOS, TIPOS_APOSTA, TURBO_OPTIONS } from "@/lib/apostas-constants";
+import { TORNEIOS, TIPOS_APOSTA, TURBO_OPTIONS, CATEGORIAS } from "@/lib/apostas-constants";
 import { CalendarIcon, TrendingUp, Wallet, Zap, Gift, Info, X, Check, ChevronsUpDown, Star } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -53,28 +53,7 @@ interface CreateApostaDialogProps {
   onSuccess: () => void;
 }
 
-const categorias = [
-  "Resultado",
-  "Finalizacoes",
-  "Escanteios",
-  "HT",
-  "FT",
-  "Gols",
-  "Chance Dupla",
-  "Chutes ao Gol",
-  "Ambas Marcam",
-  "Sofrer Falta",
-  "Cometer Falta",
-  "Cartoes",
-  "Defesas",
-  "Tiros livres",
-  "Tiros de Meta",
-  "Laterais",
-  "Desarmes",
-  "Impedimentos",
-  "Handicap",
-  "Outros"
-];
+const categorias = [...CATEGORIAS];
 
 const tiposAposta = [...TIPOS_APOSTA];
 const torneios = [...TORNEIOS];

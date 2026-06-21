@@ -1,3 +1,26 @@
+export const CATEGORIAS = [
+  "Resultado",
+  "Finalizacoes",
+  "Escanteios",
+  "HT",
+  "FT",
+  "Gols",
+  "Chance Dupla",
+  "Chutes ao Gol",
+  "Ambas Marcam",
+  "Sofrer Falta",
+  "Cometer Falta",
+  "Cartoes",
+  "Defesas",
+  "Tiros livres",
+  "Tiros de Meta",
+  "Laterais",
+  "Desarmes",
+  "Impedimentos",
+  "Handicap",
+  "Outros",
+] as const;
+
 export const TORNEIOS = [
   "Brasileirao Serie A",
   "Brasileirao Serie B",

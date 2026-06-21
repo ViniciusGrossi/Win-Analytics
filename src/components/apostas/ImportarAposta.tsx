@@ -15,24 +15,19 @@ import type { Bookie } from "@/types/betting";
 import { supabase } from "@/integrations/supabase/client";
 import { ScanOverlay } from "./ScanOverlay";
 import {
-  Upload, ImageIcon, Zap, Star, Gift, X, CheckCircle2, AlertCircle, Loader2
+  Upload, ImageIcon, Zap, Star, Gift, X, CheckCircle2, AlertCircle, Loader2, Check
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
-import { TORNEIOS, TIPOS_APOSTA, TURBO_OPTIONS } from "@/lib/apostas-constants";
+import { TORNEIOS, TIPOS_APOSTA, TURBO_OPTIONS, CATEGORIAS } from "@/lib/apostas-constants";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
 
 const SUPABASE_URL = "https://cjlvcjfuntfbdrrkigwh.supabase.co";
 
 const STATIC_TIPOS = [...TIPOS_APOSTA];
 const turboOptions = [...TURBO_OPTIONS];
-
-const DEFAULT_CATEGORIAS = [
-  "Resultado", "Ambas Marcam", "Total de Gols", "Handicap",
-  "Chutes ao Gol na Partida", "Placar Exato", "Dupla Hipótese",
-  "Primeiro a Marcar", "Cartões", "Escanteios", "Vencedor",
-  "Sofrer Falta", "Cometer Falta",
-  "Mais de 0.5 Gols", "Mais de 1.5 Gols", "Mais de 2.5 Gols",
-];
 
 const formSchema = z.object({
   casa_de_apostas: z.string().min(1, "Casa é obrigatória"),
@@ -44,7 +39,7 @@ const formSchema = z.object({
   is_super_odd: z.boolean().default(false),
   partida: z.string().optional(),
   torneio: z.string().optional(),
-  categoria: z.string().optional(),
+  categoria: z.array(z.string()).default([]),
   data: z.string().min(1, "Data é obrigatória"),
   detalhes: z.string().optional(),
 });
@@ -63,7 +58,7 @@ interface ExtractedData {
   turbo: number | null;
   partida: string | null;
   torneio: string | null;
-  categoria: string | null;
+  categoria: string[] | string | null;
   data: string | null;
   detalhes: string | null;
 }
@@ -88,7 +83,8 @@ export function ImportarAposta({ onSuccess, sharedImage }: ImportarApostaProps) 
   const [selectedTurbo, setSelectedTurbo] = useState(0);
   const [hasBonus, setHasBonus] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [oddInputs, setOddInputs] = useState<string[]>([""]);
+  const [oddInputs, setOddInputs] = useState<string[]>([""])
+  const [categorySearch, setCategorySearch] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const computedOdd = oddInputs.reduce((acc, v) => {
@@ -112,7 +108,7 @@ export function ImportarAposta({ onSuccess, sharedImage }: ImportarApostaProps) 
       is_super_odd: false,
       partida: "",
       torneio: "",
-      categoria: "",
+      categoria: [],
       data: format(new Date(), "yyyy-MM-dd"),
       detalhes: "",
     },
@@ -198,6 +194,14 @@ export function ImportarAposta({ onSuccess, sharedImage }: ImportarApostaProps) 
       const tipoNorm = normalizeTipo(data.tipo_aposta);
       const torneioNorm = normalizeTorneio(data.torneio);
 
+      // Normaliza categoria: IA pode retornar array ou string
+      const rawCat = data.categoria;
+      const categoriaArray: string[] = Array.isArray(rawCat)
+        ? rawCat.filter(Boolean)
+        : typeof rawCat === "string" && rawCat
+          ? rawCat.split(",").map(c => c.trim()).filter(Boolean)
+          : [];
+
       form.reset({
         casa_de_apostas: data.casa_de_apostas || "",
         tipo_aposta: tipoNorm || data.tipo_aposta || "",
@@ -208,7 +212,7 @@ export function ImportarAposta({ onSuccess, sharedImage }: ImportarApostaProps) 
         is_super_odd: data.is_super_odd ?? false,
         partida: data.partida || "",
         torneio: torneioNorm,
-        categoria: data.categoria || "",
+        categoria: categoriaArray,
         data: data.data || format(new Date(), "yyyy-MM-dd"),
         detalhes: data.detalhes || "",
       });
@@ -232,7 +236,7 @@ export function ImportarAposta({ onSuccess, sharedImage }: ImportarApostaProps) 
 
       await apostasService.create(
         {
-          categoria: data.categoria || "",
+          categoria: data.categoria.join(", "),
           tipo_aposta: data.tipo_aposta,
           casa_de_apostas: data.casa_de_apostas,
           valor_apostado: data.valor_apostado,
@@ -274,7 +278,7 @@ export function ImportarAposta({ onSuccess, sharedImage }: ImportarApostaProps) 
   const tiposOptions = [...new Set([...STATIC_TIPOS, ...existingTipos])];
   const torneiosOptions = [...new Set([...TORNEIOS, ...existingTorneios])];
   const casasOptions = bookies.map(b => b.name);
-  const categoriasOptions = [...new Set([...DEFAULT_CATEGORIAS, ...existingCategorias])];
+  const categoriasOptions = [...CATEGORIAS];
 
   const isMissing = (field: string) => missingFields.has(field);
   const clearMissing = (field: string) => setMissingFields(s => { const n = new Set(s); n.delete(field); return n; });
@@ -524,21 +528,63 @@ export function ImportarAposta({ onSuccess, sharedImage }: ImportarApostaProps) 
                     </FormItem>
                   )} />
 
-                  <FormField control={form.control} name="categoria" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Categoria</FormLabel>
-                      <Select value={field.value || ""} onValueChange={field.onChange}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Selecione..." />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent className="max-h-60 overflow-y-auto [touch-action:pan-y]">
-                          {categoriasOptions.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                    </FormItem>
-                  )} />
+                  <FormField control={form.control} name="categoria" render={({ field }) => {
+                    const filtered = categoriasOptions.filter(c =>
+                      c.toLowerCase().includes(categorySearch.toLowerCase())
+                    );
+                    return (
+                      <FormItem>
+                        <FormLabel>Categoria</FormLabel>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <FormControl>
+                              <Button variant="outline" role="combobox" className={cn("w-full justify-between", field.value.length === 0 && "text-muted-foreground")}>
+                                {field.value.length === 0 ? "Selecione categorias" : `${field.value.length} selecionada(s)`}
+                              </Button>
+                            </FormControl>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-full p-0 z-50" align="start" onOpenAutoFocus={(e) => e.preventDefault()}>
+                            <div className="flex flex-col" style={{ maxHeight: '300px', height: '300px' }}>
+                              <div className="p-2 border-b flex-shrink-0">
+                                <Input placeholder="Buscar..." value={categorySearch} onChange={(e) => setCategorySearch(e.target.value)} className="h-8" />
+                              </div>
+                              <div
+                                className="flex-1 p-1"
+                                style={{ overflowY: 'scroll', WebkitOverflowScrolling: 'touch', touchAction: 'pan-y', overscrollBehavior: 'contain', minHeight: 0 } as React.CSSProperties}
+                                onWheel={(e) => e.stopPropagation()}
+                                onTouchMove={(e) => e.stopPropagation()}
+                              >
+                                {filtered.map((cat) => (
+                                  <div key={cat} onClick={() => {
+                                    const cur = field.value || [];
+                                    field.onChange(cur.includes(cat) ? cur.filter(v => v !== cat) : [...cur, cat]);
+                                  }} className="flex items-center gap-2 p-2 rounded-sm hover:bg-accent cursor-pointer select-none">
+                                    <Checkbox checked={field.value?.includes(cat)} onCheckedChange={(checked) => {
+                                      const cur = field.value || [];
+                                      field.onChange(checked ? [...cur, cat] : cur.filter(v => v !== cat));
+                                    }} />
+                                    <span className="text-sm flex-1">{cat}</span>
+                                    {field.value?.includes(cat) && <Check className="h-4 w-4 text-primary" />}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </PopoverContent>
+                        </Popover>
+                        {field.value.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {field.value.map(cat => (
+                              <Badge key={cat} variant="secondary" className="text-xs">
+                                {cat}
+                                <X className="h-3 w-3 ml-1 cursor-pointer" onClick={() => field.onChange(field.value.filter(v => v !== cat))} />
+                              </Badge>
+                            ))}
+                          </div>
+                        )}
+                        <FormMessage />
+                      </FormItem>
+                    );
+                  }} />
                 </div>
 
                 {/* Detalhes */}
