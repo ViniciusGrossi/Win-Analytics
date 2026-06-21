@@ -85,7 +85,7 @@ export function ImportarAposta({ onSuccess, sharedImage }: ImportarApostaProps) 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [oddInputs, setOddInputs] = useState<string[]>([""])
   const [categorySearch, setCategorySearch] = useState("");
-  const [selectedModel, setSelectedModel] = useState<"auto" | "90b" | "11b">("auto");
+  const [selectedModel, setSelectedModel] = useState<"auto" | "90b" | "11b" | "gpt4o">("auto");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const computedOdd = oddInputs.reduce((acc, v) => {
@@ -332,7 +332,7 @@ export function ImportarAposta({ onSuccess, sharedImage }: ImportarApostaProps) 
             {imagePreview && (
               <div className="space-y-2">
                 <div className="flex gap-1.5 justify-center">
-                  {(["auto", "90b", "11b"] as const).map((m) => (
+                  {(["auto", "90b", "11b", "gpt4o"] as const).map((m) => (
                     <button
                       key={m}
                       type="button"
@@ -344,7 +344,7 @@ export function ImportarAposta({ onSuccess, sharedImage }: ImportarApostaProps) 
                           : "bg-background text-muted-foreground border-border hover:border-primary/50"
                       )}
                     >
-                      {m === "auto" ? "⚡ Auto" : m === "90b" ? "🎯 90B (preciso)" : "🚀 11B (rápido)"}
+                      {m === "auto" ? "⚡ Auto" : m === "90b" ? "🎯 90B" : m === "11b" ? "🚀 11B" : "🤖 GPT-4o"}
                     </button>
                   ))}
                 </div>

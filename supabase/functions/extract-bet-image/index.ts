@@ -77,7 +77,7 @@ REGRAS DE EXTRAÇÃO:
 - Responda APENAS com o JSON, sem markdown, sem explicações`;
 }
 
-const MODELS = {
+const NVIDIA_MODELS = {
   "90b": "meta/llama-3.2-90b-vision-instruct",
   "11b": "meta/llama-3.2-11b-vision-instruct",
 } as const;
@@ -110,6 +110,33 @@ async function callNvidia(
   });
 }
 
+async function callOpenAI(
+  systemPrompt: string,
+  imageBase64: string,
+  mimeType: string,
+  apiKey: string,
+) {
+  return fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "gpt-4o-mini",
+      messages: [
+        { role: "system", content: systemPrompt },
+        {
+          role: "user",
+          content: [
+            { type: "image_url", image_url: { url: `data:${mimeType};base64,${imageBase64}`, detail: "high" } },
+            { type: "text", text: "Extraia os dados desta aposta esportiva e retorne o JSON." },
+          ],
+        },
+      ],
+      max_tokens: 1024,
+      temperature: 0.1,
+    }),
+  });
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -117,7 +144,7 @@ serve(async (req) => {
 
   try {
     const nvidiaApiKey = Deno.env.get("NVIDIA_API_KEY");
-    if (!nvidiaApiKey) throw new Error("NVIDIA_API_KEY não configurada");
+    const openaiApiKey = Deno.env.get("OPENAI_API_KEY");
 
     const { imageBase64, mimeType = "image/jpeg", torneios = [], casas = [], currentDate, model } = await req.json();
     if (!imageBase64) throw new Error("imageBase64 é obrigatório");
@@ -125,34 +152,66 @@ serve(async (req) => {
     const today = currentDate || new Date().toISOString().split("T")[0];
     const systemPrompt = buildPrompt(torneios as string[], casas as string[], today);
 
-    // Se usuário escolheu modelo específico, usa direto; senão auto com fallback
-    const modelsToTry: string[] = model
-      ? [model === "11b" ? MODELS["11b"] : MODELS["90b"]]
-      : [MODELS["90b"], MODELS["11b"]];
+    type Job =
+      | { provider: "nvidia"; modelId: string }
+      | { provider: "openai" };
+
+    let jobs: Job[];
+    if (model === "gpt4o") {
+      if (!openaiApiKey) throw new Error("OPENAI_API_KEY não configurada");
+      jobs = [{ provider: "openai" }];
+    } else if (model === "11b") {
+      if (!nvidiaApiKey) throw new Error("NVIDIA_API_KEY não configurada");
+      jobs = [{ provider: "nvidia", modelId: NVIDIA_MODELS["11b"] }];
+    } else if (model === "90b") {
+      if (!nvidiaApiKey) throw new Error("NVIDIA_API_KEY não configurada");
+      jobs = [{ provider: "nvidia", modelId: NVIDIA_MODELS["90b"] }];
+    } else {
+      // auto: NVIDIA 90B → 11B → OpenAI
+      jobs = [
+        ...(nvidiaApiKey ? [
+          { provider: "nvidia" as const, modelId: NVIDIA_MODELS["90b"] },
+          { provider: "nvidia" as const, modelId: NVIDIA_MODELS["11b"] },
+        ] : []),
+        ...(openaiApiKey ? [{ provider: "openai" as const }] : []),
+      ];
+      if (jobs.length === 0) throw new Error("Nenhuma API key configurada (NVIDIA_API_KEY ou OPENAI_API_KEY)");
+    }
 
     let lastError = "";
     let usedModel = "";
 
-    for (const m of modelsToTry) {
-      const response = await callNvidia(m, systemPrompt, imageBase64, mimeType, nvidiaApiKey);
+    for (const job of jobs) {
+      let response: Response;
+      let label: string;
+
+      if (job.provider === "nvidia") {
+        if (!nvidiaApiKey) continue;
+        label = job.modelId;
+        response = await callNvidia(job.modelId, systemPrompt, imageBase64, mimeType, nvidiaApiKey);
+      } else {
+        if (!openaiApiKey) continue;
+        label = "gpt-4o-mini";
+        response = await callOpenAI(systemPrompt, imageBase64, mimeType, openaiApiKey);
+      }
 
       if (!response.ok) {
         const errorText = await response.text();
-        lastError = `${m} → ${response.status}: ${errorText}`;
+        lastError = `${label} → ${response.status}: ${errorText}`;
         continue;
       }
 
-      const nvidiaData = await response.json();
-      const rawContent = nvidiaData.choices?.[0]?.message?.content ?? "";
+      const data = await response.json();
+      const rawContent = data.choices?.[0]?.message?.content ?? "";
 
       const jsonMatch = rawContent.match(/\{[\s\S]*\}/);
       if (!jsonMatch) {
-        lastError = `${m} → JSON inválido: ${rawContent.slice(0, 200)}`;
+        lastError = `${label} → JSON inválido: ${rawContent.slice(0, 200)}`;
         continue;
       }
 
       const extracted = JSON.parse(jsonMatch[0]);
-      usedModel = m;
+      usedModel = label;
 
       return new Response(JSON.stringify({ data: extracted, raw: rawContent, model: usedModel }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
