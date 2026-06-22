@@ -75,7 +75,6 @@ export default function Auth() {
         setEmail("");
         setPassword("");
         setConfirmPassword("");
-        // Opcional: Você pode querer mudar para a aba de login agora?
       }
     } catch (err) {
       console.error("SignUp Error:", err);
@@ -86,7 +85,7 @@ export default function Auth() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-executive-950">
+    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-background">
       {/* Background elements */}
       <div className="bg-grid opacity-20" />
       <div className="ambient-glow-static" />
