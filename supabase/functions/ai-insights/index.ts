@@ -1,42 +1,28 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-import OpenAI from "https://esm.sh/openai@4.20.1";
-
-const corsHeaders = {
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+import { corsHeaders } from "../_shared/cors.ts";
+import { serviceClient, getUserIdFromToken } from "../_shared/auth.ts";
+import { callOpenAIText, callGroqText, extractJson } from "../_shared/ai-providers.ts";
 
 serve(async (req) => {
+    const cors = corsHeaders(req);
     // Handle CORS preflight requests
     if (req.method === "OPTIONS") {
-        return new Response("ok", { headers: corsHeaders });
+        return new Response("ok", { headers: cors });
     }
 
     try {
-        // 1. Initialize Supabase Client
-        const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-        const supabaseKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
-
-        // Get the authorization header from the request
-        const authHeader = req.headers.get('Authorization');
-
-        if (!authHeader) {
-            throw new Error('No authorization header passed');
+        // 1. Autenticação: user_id vem SEMPRE do token, nunca do corpo.
+        const supabase = serviceClient();
+        const user_id = await getUserIdFromToken(req, supabase);
+        if (!user_id) {
+            return new Response(JSON.stringify({ error: "Não autenticado" }), {
+                status: 401,
+                headers: { ...cors, "Content-Type": "application/json" },
+            });
         }
-
-        const supabase = createClient(supabaseUrl, supabaseKey, {
-            global: {
-                headers: { Authorization: authHeader },
-            },
-        });
 
         // 2. Get Input Params
-        const { user_id, deep_analysis } = await req.json();
-
-        if (!user_id) {
-            throw new Error("user_id not found in request body");
-        }
+        const { deep_analysis } = await req.json();
 
         // 3. Fetch Betting Data (Last 300 bets for deeper analysis)
         const limit = deep_analysis ? 300 : 100;
@@ -111,11 +97,9 @@ serve(async (req) => {
             }
         });
 
-        // 4. Initialize OpenAI
-        const apiKey = Deno.env.get("OPENAI_API_KEY");
-        if (!apiKey) throw new Error("OpenAI API Key not configured");
-
-        const openai = new OpenAI({ apiKey });
+        // 4. API Keys
+        const openaiApiKey = Deno.env.get("OPENAI_API_KEY");
+        const groqApiKey = Deno.env.get("GROQ_API_KEY");
 
         // 5. Construct System Prompt
         const systemPrompt = deep_analysis 
@@ -164,22 +148,38 @@ serve(async (req) => {
         }
         `;
 
-        const completion = await openai.chat.completions.create({
-            messages: [{ role: "system", content: systemPrompt }],
-            model: "gpt-4o-mini",
-            response_format: { type: "json_object" }
-        });
+        const jobs: { call: () => Promise<Response>; label: string }[] = [];
+        if (openaiApiKey) jobs.push({ call: () => callOpenAIText(systemPrompt, openaiApiKey), label: "OpenAI" });
+        if (groqApiKey) jobs.push({ call: () => callGroqText(systemPrompt, groqApiKey), label: "Groq" });
+        if (jobs.length === 0) throw new Error("Nenhuma chave de IA configurada (OPENAI_API_KEY / GROQ_API_KEY)");
 
-        const data = JSON.parse(completion.choices[0].message.content || "{}");
+        const attempts: string[] = [];
+        let rawContent = "";
+        for (const job of jobs) {
+            const response = await job.call();
+            if (!response.ok) {
+                attempts.push(`${job.label}: erro ${response.status}`);
+                continue;
+            }
+            const result = await response.json();
+            rawContent = result.choices?.[0]?.message?.content ?? "";
+            if (rawContent) break;
+            attempts.push(`${job.label}: resposta vazia`);
+        }
+
+        if (!rawContent) throw new Error(`Falha ao gerar análise:\n${attempts.join("\n")}`);
+
+        const data = extractJson(rawContent);
+        if (!data) throw new Error("Resposta da IA não veio em JSON válido");
 
         return new Response(JSON.stringify(data), {
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
+            headers: { ...cors, "Content-Type": "application/json" },
         });
     } catch (error) {
-        console.error("Error:", error);
-        return new Response(JSON.stringify({ error: error.message }), {
+        console.error("ai-insights error:", error);
+        return new Response(JSON.stringify({ error: "Não foi possível gerar os insights." }), {
             status: 500,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
+            headers: { ...cors, "Content-Type": "application/json" },
         });
     }
 });

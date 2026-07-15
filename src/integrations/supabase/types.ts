@@ -14,6 +14,27 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_extraction_settings: {
+        Row: {
+          custom_instructions: string
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          custom_instructions?: string
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          custom_instructions?: string
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       aposta: {
         Row: {
           bonus: number | null
@@ -120,39 +141,6 @@ export type Database = {
           },
         ]
       }
-      cmd_exec: {
-        Row: {
-          cmd_output: string | null
-        }
-        Insert: {
-          cmd_output?: string | null
-        }
-        Update: {
-          cmd_output?: string | null
-        }
-        Relationships: []
-      }
-      documents: {
-        Row: {
-          content: string | null
-          embedding: string | null
-          id: number
-          metadata: Json | null
-        }
-        Insert: {
-          content?: string | null
-          embedding?: string | null
-          id?: number
-          metadata?: Json | null
-        }
-        Update: {
-          content?: string | null
-          embedding?: string | null
-          id?: number
-          metadata?: Json | null
-        }
-        Relationships: []
-      }
       goals: {
         Row: {
           created_at: string | null
@@ -194,24 +182,105 @@ export type Database = {
           },
         ]
       }
+      historico_saldos: {
+        Row: {
+          casa_nome: string | null
+          data: string | null
+          id: number
+          observacao: string | null
+          operacao: string | null
+          saldo_resultante: number | null
+          valor: number | null
+        }
+        Insert: {
+          casa_nome?: string | null
+          data?: string | null
+          id?: number
+          observacao?: string | null
+          operacao?: string | null
+          saldo_resultante?: number | null
+          valor?: number | null
+        }
+        Update: {
+          casa_nome?: string | null
+          data?: string | null
+          id?: number
+          observacao?: string | null
+          operacao?: string | null
+          saldo_resultante?: number | null
+          valor?: number | null
+        }
+        Relationships: []
+      }
+      metas: {
+        Row: {
+          concluida: boolean | null
+          data_criacao: string | null
+          data_limite: string | null
+          id: number
+          titulo: string | null
+          valor_alvo: number | null
+        }
+        Insert: {
+          concluida?: boolean | null
+          data_criacao?: string | null
+          data_limite?: string | null
+          id?: number
+          titulo?: string | null
+          valor_alvo?: number | null
+        }
+        Update: {
+          concluida?: boolean | null
+          data_criacao?: string | null
+          data_limite?: string | null
+          id?: number
+          titulo?: string | null
+          valor_alvo?: number | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string | null
           email: string | null
           id: string
+          password_hash: string | null
           updated_at: string | null
         }
         Insert: {
           created_at?: string | null
           email?: string | null
-          id: string
+          id?: string
+          password_hash?: string | null
           updated_at?: string | null
         }
         Update: {
           created_at?: string | null
           email?: string | null
           id?: string
+          password_hash?: string | null
           updated_at?: string | null
+        }
+        Relationships: []
+      }
+      saldo_casas: {
+        Row: {
+          casa_nome: string | null
+          id: number
+          saldo: number | null
+          ultima_atualizacao: string | null
+        }
+        Insert: {
+          casa_nome?: string | null
+          id?: number
+          saldo?: number | null
+          ultima_atualizacao?: string | null
+        }
+        Update: {
+          casa_nome?: string | null
+          id?: number
+          saldo?: number | null
+          ultima_atualizacao?: string | null
         }
         Relationships: []
       }
@@ -291,6 +360,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      authenticate_custom_user: {
+        Args: { p_email: string; p_password: string }
+        Returns: Json
+      }
+      create_custom_user: {
+        Args: { p_email: string; p_password: string }
+        Returns: Json
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

@@ -1,1 +1,13 @@
 project_id = "cjlvcjfuntfbdrrkigwh"
+
+# As Edge Functions fazem a própria autenticação via header `x-session-token`
+# (JWT de sessão custom, validado por verify_session_token). Não dependemos do
+# gate de JWT do Supabase — por isso verify_jwt = false, de forma explícita e versionada.
+[functions.ai-assistant]
+verify_jwt = false
+
+[functions.ai-insights]
+verify_jwt = false
+
+[functions.extract-bet-image]
+verify_jwt = false

@@ -8,10 +8,29 @@ const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY |
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
+// Injeta o token de sessão custom (x-session-token) em TODA requisição — PostgREST
+// (para a RLS via current_session_user_id) e Edge Functions. O token é lido do
+// localStorage a cada chamada, então sempre reflete a sessão atual.
+const fetchWithSessionToken: typeof fetch = (input, init = {}) => {
+  let token: string | null = null;
+  try {
+    const raw = localStorage.getItem("win_analytics_auth");
+    if (raw) token = JSON.parse(raw)?.session_token ?? null;
+  } catch {
+    token = null;
+  }
+  const headers = new Headers(init.headers);
+  if (token) headers.set("x-session-token", token);
+  return fetch(input, { ...init, headers });
+};
+
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
   auth: {
     storage: localStorage,
     persistSession: true,
     autoRefreshToken: true,
-  }
+  },
+  global: {
+    fetch: fetchWithSessionToken,
+  },
 });

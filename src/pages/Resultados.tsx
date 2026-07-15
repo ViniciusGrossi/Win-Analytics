@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { motion } from "framer-motion";
 import { apostasService } from "@/services/apostas";
 import { ResultadoCard } from "@/components/resultados/ResultadoCard";
@@ -7,35 +7,19 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import type { Aposta, ResultadoType } from "@/types/betting";
+import type { ResultadoType } from "@/types/betting";
 import { toast } from "@/hooks/use-toast";
 import { Search, SlidersHorizontal, X } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
+import { useApostasList, useInvalidateApostas } from "@/hooks/useApostasQuery";
 
 export default function Resultados() {
-  const [apostas, setApostas] = useState<Aposta[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const { data: apostas = [], isLoading } = useApostasList({});
+  const invalidateApostas = useInvalidateApostas();
   const [searchTerm, setSearchTerm] = useState("");
   const [filterCasa, setFilterCasa] = useState<string>("todas");
   const [filterTipo, setFilterTipo] = useState<string>("todos");
   const [sortBy, setSortBy] = useState<"data" | "valor" | "odd">("data");
-
-  useEffect(() => {
-    loadApostas();
-  }, []);
-
-  const loadApostas = async () => {
-    setIsLoading(true);
-    try {
-      const { data } = await apostasService.list({});
-      setApostas(data);
-    } catch (error) {
-      console.error("Erro ao carregar apostas:", error);
-      toast({ title: "Erro", description: "Erro ao carregar apostas", variant: "destructive" });
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const apostasPendentes = useMemo(() => {
     let filtered = apostas.filter((aposta) => aposta.resultado === "Pendente");
@@ -97,9 +81,9 @@ export default function Resultados() {
       if (!aposta) throw new Error("Aposta não encontrada");
 
       await apostasService.setResult(id, resultado, aposta, cashoutValue);
-      
+
       toast({ title: "Sucesso", description: `Resultado marcado como ${resultado}` });
-      await loadApostas();
+      invalidateApostas();
     } catch (error) {
       console.error("Erro ao definir resultado:", error);
       toast({ title: "Erro", description: "Erro ao definir resultado", variant: "destructive" });

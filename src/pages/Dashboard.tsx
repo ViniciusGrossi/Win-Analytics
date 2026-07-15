@@ -1,14 +1,13 @@
-import { useState, useEffect } from "react";
+import { useMemo } from "react";
 import { motion } from "framer-motion";
 import { TrendingUp, DollarSign, Target, TrendingDown, ClipboardList, Clock, Calendar as CalendarIcon } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { KPICard } from "@/components/dashboard/KPICard";
 import { LucroChart } from "@/components/dashboard/LucroChart";
 import { DistributionChart } from "@/components/dashboard/DistributionChart";
-import { apostasService } from "@/services/apostas";
+import { useApostasKpis, useApostasSeries, useApostasList } from "@/hooks/useApostasQuery";
 import { useFilterStore } from "@/store/useFilterStore";
 import { formatCurrency, formatPercentage } from "@/lib/utils";
-import type { KPIData, SeriesData } from "@/types/betting";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
@@ -17,43 +16,25 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
 export default function Dashboard() {
-  const [kpis, setKpis] = useState<KPIData | null>(null);
-  const [series, setSeries] = useState<SeriesData[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [distribution, setDistribution] = useState<{ name: string; value: number }[]>([]);
   const { startDate, endDate, casa, tipo, setStartDate, setEndDate, resetFilters } = useFilterStore();
+  const params = { startDate, endDate, casa, tipo };
 
-  useEffect(() => {
-    loadData();
-  }, [startDate, endDate, casa, tipo]);
+  const kpisQuery = useApostasKpis(params);
+  const seriesQuery = useApostasSeries(params);
+  const listQuery = useApostasList(params);
 
-  const loadData = async () => {
-    setIsLoading(true);
-    try {
-      const [kpisData, seriesData, apostas] = await Promise.all([
-        apostasService.kpis({ startDate, endDate, casa, tipo }),
-        apostasService.series({ startDate, endDate, casa, tipo }),
-        apostasService.list({ startDate, endDate, casa, tipo }),
-      ]);
-      
-      setKpis(kpisData);
-      setSeries(seriesData);
+  const isLoading = kpisQuery.isLoading || seriesQuery.isLoading || listQuery.isLoading;
+  const kpis = kpisQuery.data ?? null;
+  const series = seriesQuery.data ?? [];
 
-      const statusCount = (apostas?.data || []).reduce((acc, aposta) => {
-        const status = aposta.resultado || "Pendente";
-        acc[status] = (acc[status] || 0) + 1;
-        return acc;
-      }, {} as Record<string, number>);
-
-      setDistribution(
-        Object.entries(statusCount).map(([name, value]) => ({ name, value }))
-      );
-    } catch (error) {
-      console.error("Erro ao carregar dados:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const distribution = useMemo(() => {
+    const statusCount = (listQuery.data || []).reduce((acc, aposta) => {
+      const status = aposta.resultado || "Pendente";
+      acc[status] = (acc[status] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+    return Object.entries(statusCount).map(([name, value]) => ({ name, value }));
+  }, [listQuery.data]);
 
   const formatDateSafely = (dateStr: string | null) => {
     if (!dateStr) return null;

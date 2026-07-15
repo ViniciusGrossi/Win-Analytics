@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -7,8 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { apostasService } from "@/services/apostas";
-import type { Aposta, SeriesData } from "@/types/betting";
+import { useApostasList } from "@/hooks/useApostasQuery";
 import { KPICard } from "@/components/dashboard/KPICard";
 import { formatCurrency, formatPercentage } from "@/lib/utils";
 import { useFilterStore } from "@/store/useFilterStore";
@@ -95,9 +94,6 @@ import { PatternCorrelationTab } from "@/components/analysis/tabs/PatternCorrela
 import { CHART_COLORS } from "@/lib/constants";
 
 export default function Analises() {
-  const [allApostas, setAllApostas] = useState<Aposta[]>([]); // Para extrair casas/mercados
-  const [series, setSeries] = useState<SeriesData[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("dashboard");
 
   const {
@@ -118,6 +114,19 @@ export default function Analises() {
     setOddMax,
     resetFilters
   } = useFilterStore();
+
+  const params = useMemo(() => ({
+    startDate: startDate || undefined,
+    endDate: endDate || undefined,
+    casa: casa && casa !== "Todas" ? casa : undefined,
+    tipo: tipo || undefined,
+  }), [startDate, endDate, casa, tipo]);
+
+  const listQuery = useApostasList(params);
+  const allApostas = listQuery.data ?? [];
+  const isLoading = listQuery.isLoading;
+  const isFetching = listQuery.isFetching;
+  const refetch = () => listQuery.refetch();
 
   // Filtered apuestas memoized to avoid recalculation on tab switches
   const filteredApostas = useMemo(() => {
@@ -177,35 +186,6 @@ export default function Analises() {
     ).sort()
   , [allApostas]);
 
-  useEffect(() => {
-    loadData();
-  }, [startDate, endDate, casa, tipo]); // Only reload from API when core filters change
-
-  const loadData = async () => {
-    setIsLoading(true);
-    try {
-      const params = {
-        startDate: startDate || undefined,
-        endDate: endDate || undefined,
-        casa: casa && casa !== "Todas" ? casa : undefined,
-        tipo: tipo || undefined,
-      };
-
-      const [apostasData, seriesData] = await Promise.all([
-        apostasService.list(params),
-        apostasService.series(params),
-      ]);
-
-      setAllApostas(apostasData.data);
-      setSeries(seriesData);
-    } catch (error) {
-      console.error("Erro ao carregar dados:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-
   if (isLoading) {
     return (
       <div className="space-y-6">
@@ -238,8 +218,8 @@ export default function Analises() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={loadData} disabled={isLoading}>
-            <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+          <Button variant="outline" onClick={refetch} disabled={isFetching}>
+            <RefreshCw className={`mr-2 h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
             Atualizar
           </Button>
         </div>

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { motion } from "framer-motion";
 import { bookiesService } from "@/services/bookies";
 import { BookieCard } from "@/components/banca/BookieCard";
@@ -8,38 +8,22 @@ import { GoalsManager } from "@/components/banca/GoalsManager";
 import { BettingUnits } from "@/components/banca/BettingUnits";
 import { formatCurrency } from "@/lib/utils";
 import { Wallet, TrendingUp, Calendar, Plus } from "lucide-react";
-import type { Bookie } from "@/types/betting";
 import dayjs from "dayjs";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
+import { useBookiesQuery, useInvalidateBookies } from "@/hooks/useBookiesQuery";
 
 export default function Banca() {
-  const [bookies, setBookies] = useState<Bookie[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const { data: bookiesRaw = [], isLoading } = useBookiesQuery();
+  const invalidateBookies = useInvalidateBookies();
+  const bookies = useMemo(() => [...bookiesRaw].sort((a, b) => (b.balance || 0) - (a.balance || 0)), [bookiesRaw]);
   const [createOpen, setCreateOpen] = useState(false);
   const [newName, setNewName] = useState("");
   const [initialBalance, setInitialBalance] = useState("");
   const [isCreating, setIsCreating] = useState(false);
-
-  useEffect(() => {
-    loadBookies();
-  }, []);
-
-  const loadBookies = async () => {
-    setIsLoading(true);
-    try {
-      const data = await bookiesService.list();
-      const sorted = data.sort((a, b) => (b.balance || 0) - (a.balance || 0));
-      setBookies(sorted);
-    } catch (error) {
-      console.error("Erro ao carregar bookies:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const handleCreateBookie = async () => {
     const name = newName.trim();
@@ -59,7 +43,7 @@ export default function Banca() {
       setCreateOpen(false);
       setNewName("");
       setInitialBalance("");
-      await loadBookies();
+      invalidateBookies();
     } catch (error) {
       console.error("Erro ao criar casa:", error);
       const errMsg = (error as any)?.message || "Erro ao criar casa de apostas";
@@ -135,7 +119,7 @@ export default function Banca() {
         ) : bookies.length > 0 ? (
           <div className="grid gap-3 sm:gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
             {bookies.map((bookie) => (
-              <BookieCard key={bookie.id} bookie={bookie} onUpdate={loadBookies} />
+              <BookieCard key={bookie.id} bookie={bookie} onUpdate={invalidateBookies} />
             ))}
           </div>
         ) : (

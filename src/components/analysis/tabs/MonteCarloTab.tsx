@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
-import { Play, TrendingUp, TrendingDown, AlertCircle } from "lucide-react";
+import { Play, TrendingUp, TrendingDown, AlertCircle, Activity } from "lucide-react";
 import {
   LineChart,
   Line,

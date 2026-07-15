@@ -1,10 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+import { corsHeaders } from "../_shared/cors.ts";
+import { serviceClient, getUserIdFromToken } from "../_shared/auth.ts";
+import { extractJson } from "../_shared/ai-providers.ts";
 
 // ── Analytics Engine ──────────────────────────────────────────────────────────
 
@@ -228,28 +225,26 @@ function computeAnalytics(bets: Bet[], bookies: { name: string; balance: number 
 // ── Edge Function ─────────────────────────────────────────────────────────────
 
 serve(async (req) => {
+  const cors = corsHeaders(req);
   if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+    return new Response("ok", { headers: cors });
   }
 
   try {
+    const supabase = serviceClient();
+    const user_id = await getUserIdFromToken(req, supabase);
+    if (!user_id) {
+      return new Response(JSON.stringify({ error: "Não autenticado" }), {
+        status: 401,
+        headers: { ...cors, "Content-Type": "application/json" },
+      });
+    }
+
     const { message, history = [], modelMode = "fast" } = await req.json();
 
-    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-    const supabaseKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) throw new Error("Authorization header ausente");
-
-    const supabase = createClient(supabaseUrl, supabaseKey, {
-      global: { headers: { Authorization: authHeader } },
-    });
-
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError || !user) throw new Error("Usuário não autenticado");
-
     const [{ data: allBets }, { data: bookies }] = await Promise.all([
-      supabase.from("aposta").select("*").eq("user_id", user.id).order("data", { ascending: false }).limit(2000),
-      supabase.from("bookies").select("name, balance").eq("user_id", user.id),
+      supabase.from("aposta").select("*").eq("user_id", user_id).order("data", { ascending: false }).limit(2000),
+      supabase.from("bookies").select("name, balance").eq("user_id", user_id),
     ]);
 
     const analytics = computeAnalytics((allBets ?? []) as Bet[], bookies ?? []);
@@ -315,22 +310,18 @@ FORMATO OBRIGATÓRIO (JSON puro, sem markdown ao redor):
     const nvidiaData = await response.json();
     const rawContent: string = nvidiaData.choices?.[0]?.message?.content ?? "";
 
-    let parsed: { reply: string; suggestedQuestions: string[] };
-    try {
-      const match = rawContent.match(/\{[\s\S]*\}/);
-      parsed = JSON.parse(match ? match[0] : rawContent);
-    } catch {
-      parsed = { reply: rawContent, suggestedQuestions: [] };
-    }
+    const parsed = extractJson<{ reply: string; suggestedQuestions: string[] }>(rawContent)
+      ?? { reply: rawContent, suggestedQuestions: [] };
 
     return new Response(JSON.stringify(parsed), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      headers: { ...cors, "Content-Type": "application/json" },
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    return new Response(JSON.stringify({ error: message }), {
+    // Loga o detalhe no servidor, mas não vaza mensagem de provider/upstream ao cliente.
+    console.error("ai-assistant error:", error);
+    return new Response(JSON.stringify({ error: "Falha ao gerar a resposta. Tente novamente." }), {
       status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      headers: { ...cors, "Content-Type": "application/json" },
     });
   }
 });

@@ -3,11 +3,13 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/hooks/useAuth";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { useTheme } from "next-themes";
-import { Moon, Sun, User, Mail, Shield } from "lucide-react";
+import { Moon, Sun, User, Mail, Shield, Bot, Loader2 } from "lucide-react";
+import { aiExtractionSettingsService } from "@/services/aiExtractionSettings";
 import {
   Dialog,
   DialogContent,
@@ -44,6 +46,24 @@ export default function Configuracoes() {
   const [notificacoes, setNotificacoes] = useState(true);
   const [emailMarketing, setEmailMarketing] = useState(false);
   const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
+  const [extractionInstructions, setExtractionInstructions] = useState("");
+  const [savingExtractionInstructions, setSavingExtractionInstructions] = useState(false);
+
+  useEffect(() => {
+    aiExtractionSettingsService.get().then(setExtractionInstructions).catch(() => {});
+  }, []);
+
+  const handleSaveExtractionInstructions = async () => {
+    setSavingExtractionInstructions(true);
+    try {
+      await aiExtractionSettingsService.save(extractionInstructions);
+      toast.success("Regras de extração salvas!");
+    } catch (error) {
+      toast.error("Erro ao salvar regras: " + (error instanceof Error ? error.message : "erro desconhecido"));
+    } finally {
+      setSavingExtractionInstructions(false);
+    }
+  };
 
   const form = useForm<z.infer<typeof passwordSchema>>({
     resolver: zodResolver(passwordSchema),
@@ -287,6 +307,35 @@ export default function Configuracoes() {
             <p className="text-xs text-muted-foreground">
               Autenticação em dois fatores em breve
             </p>
+          </CardContent>
+        </Card>
+
+        {/* Regras de Extração de IA */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Bot className="h-5 w-5" />
+              Ensinar a IA
+            </CardTitle>
+            <CardDescription>
+              Regras que a IA deve sempre seguir ao ler o print de uma aposta. Mesma configuração usada na Importação.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="rounded-lg border border-border bg-muted/30 p-3 text-xs text-muted-foreground space-y-1">
+              <p className="font-medium text-foreground">Exemplos:</p>
+              <p>"A casa 'Estrela Bet' deve ser registrada como 'EstrelaBet'"</p>
+              <p>"Nunca marque categoria 'Outros' se a partida tiver escanteios"</p>
+            </div>
+            <Textarea
+              value={extractionInstructions}
+              onChange={(e) => setExtractionInstructions(e.target.value)}
+              placeholder="Ex: sempre usar o nome completo do torneio, nunca abreviar nomes de times..."
+              rows={5}
+            />
+            <Button onClick={handleSaveExtractionInstructions} disabled={savingExtractionInstructions} className="w-full">
+              {savingExtractionInstructions ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Salvando...</> : "Salvar Regras"}
+            </Button>
           </CardContent>
         </Card>
       </div>

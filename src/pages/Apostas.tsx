@@ -3,18 +3,18 @@ import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Plus, RefreshCw, ScanLine } from "lucide-react";
-import { apostasService } from "@/services/apostas";
 import { ApostasTable } from "@/components/apostas/ApostasTable";
 import { CreateApostaDialog } from "@/components/apostas/CreateApostaDialog";
 import { ApostasFilters } from "@/components/apostas/ApostasFilters";
 import { ApostasStats } from "@/components/apostas/ApostasStats";
 import { ImportarAposta } from "@/components/apostas/ImportarAposta";
-import type { Aposta, ResultadoType } from "@/types/betting";
+import type { ResultadoType } from "@/types/betting";
 import { startOfDay, endOfDay, subDays, isWithinInterval, parseISO } from "date-fns";
+import { useApostasList, useInvalidateApostas } from "@/hooks/useApostasQuery";
 
 export default function Apostas() {
-  const [apostas, setApostas] = useState<Aposta[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const { data: apostas = [], isLoading, isFetching, refetch } = useApostasList({});
+  const invalidateApostas = useInvalidateApostas();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<"apostas" | "importar">("apostas");
   const [sharedImage, setSharedImage] = useState<File | null>(null);
@@ -26,7 +26,6 @@ export default function Apostas() {
   const [dateRange, setDateRange] = useState<{ from?: Date; to?: Date }>({});
 
   useEffect(() => {
-    loadApostas();
     handleShareTarget();
   }, []);
 
@@ -52,18 +51,6 @@ export default function Apostas() {
       }
     } catch {
       setActiveTab("importar");
-    }
-  };
-
-  const loadApostas = async () => {
-    setIsLoading(true);
-    try {
-      const { data } = await apostasService.list({});
-      setApostas(data);
-    } catch (error) {
-      console.error("Erro ao carregar apostas:", error);
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -159,8 +146,8 @@ export default function Apostas() {
           <p className="text-sm text-gray-500 mt-2 font-light border-l border-gold-500/30 pl-3">Controle granular de ordens e bilhetes ativos</p>
         </div>
         <div className="flex gap-3 w-full sm:w-auto">
-          <Button onClick={loadApostas} variant="outline" className="gap-2 h-11 px-6">
-            <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+          <Button onClick={() => refetch()} variant="outline" className="gap-2 h-11 px-6">
+            <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
             <span>Atualizar</span>
           </Button>
           <Button onClick={() => setDialogOpen(true)} className="gap-2 h-11 px-6">
@@ -203,7 +190,7 @@ export default function Apostas() {
             onDateRangeChange={setDateRange}
           />
 
-          <ApostasTable data={apostasFiltradas} isLoading={isLoading} onReload={loadApostas} />
+          <ApostasTable data={apostasFiltradas} isLoading={isLoading} onReload={invalidateApostas} />
         </TabsContent>
 
         <TabsContent value="importar">
@@ -215,7 +202,7 @@ export default function Apostas() {
               </p>
             </div>
             <ImportarAposta
-              onSuccess={() => { loadApostas(); setActiveTab("apostas"); }}
+              onSuccess={() => { invalidateApostas(); setActiveTab("apostas"); }}
               sharedImage={sharedImage}
             />
           </div>
@@ -225,7 +212,7 @@ export default function Apostas() {
       <CreateApostaDialog
         open={dialogOpen}
         onOpenChange={setDialogOpen}
-        onSuccess={loadApostas}
+        onSuccess={invalidateApostas}
       />
     </div>
   );

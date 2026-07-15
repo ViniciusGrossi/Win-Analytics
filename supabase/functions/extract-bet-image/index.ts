@@ -1,9 +1,10 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { corsHeaders } from "../_shared/cors.ts";
+import { serviceClient, getUserIdFromToken } from "../_shared/auth.ts";
+import { callNvidiaVision, callOpenAIVision, callGroqVision, extractJson } from "../_shared/ai-providers.ts";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+// Limite do payload base64 da imagem (~8 MB de base64 ≈ ~6 MB de imagem).
+const MAX_IMAGE_BASE64_LEN = 8_000_000;
 
 const VISUAL_PATTERNS = `IDENTIFICAÇÃO VISUAL DE CASAS DE APOSTAS (suas casas cadastradas em destaque):
 
@@ -24,7 +25,7 @@ OUTRAS CASAS COMUNS (caso apareçam em prints):
 - Superbet: vermelho/bordô (#c0392b), logo "Superbet"
 - Pixbet: roxo/lilás, logo "pixbet"`;
 
-function buildPrompt(torneios: string[], casas: string[], currentDate: string): string {
+function buildPrompt(torneios: string[], casas: string[], currentDate: string, customInstructions?: string): string {
   const currentYear = currentDate.split("-")[0];
   const torneiosList = torneios.length > 0
     ? `TORNEIOS DISPONÍVEIS NO SISTEMA (use exatamente um destes valores ou null se não corresponder a nenhum):
@@ -67,6 +68,7 @@ REGRAS DE EXTRAÇÃO:
 - torneio: OBRIGATÓRIO usar um dos valores da lista acima se a competição corresponder. Ex: "English Premier League"/"EPL"/"PL" → "Premier League". "UEFA Champions League" → "Champions League". TURBINACO não é torneio — é um produto da Betnacional; extraia a competição real ou retorne null. Se não corresponder a nenhum da lista, retorne null
 - casa_de_apostas: se a casa estiver na lista cadastrada, use o nome EXATO da lista. Se não estiver, use o nome que aparecer na imagem ou identifique pelos padrões visuais. TURBINACO e eventos com "(BN)" indicam Betnacional
 - data: extraia dia e mês da imagem. Para o ANO, use SEMPRE ${currentYear} exceto se um ano diferente estiver claramente impresso na imagem E fizer sentido (ex: aposta futura). Se só vir "HH:MM" ou "DD/MM" sem ano, use ${currentYear}
+- partida: SEMPRE use "x" minúsculo como separador entre os dois times/lados (ex: "Espanha x França", "Brasil x Argentina"). NUNCA use "vs", "vs.", "versus" ou "×" — normalize qualquer um desses para "x"
 - valor_apostado: valor em REAIS (R$) que o usuário pagou/apostou. Vem rotulado como "Valor", "Aposta", "Stake", "R$", "Valor da Aposta". É SEMPRE acompanhado de símbolo monetário (R$). NUNCA confunda com a odd (que é um número decimal sem R$). Exemplo: se a imagem mostra "R$ 20,00" ao lado de "Valor da Aposta" e "3.00" ao lado de "Odd", então valor_apostado=20, odd=3
 - odd: multiplicador decimal SEM símbolo monetário (ex: 1.50, 2.30, 3.00). Vem rotulado como "Odd", "Cota", "@ 3.00". Verificação cruzada: valor_apostado × odd ≈ "Potencial ganho" ou "Retorno". Se valor_apostado=20 e odd=3, potencial=60. Se não bater, revise os dois campos
 - is_super_odd: true se houver badge/destaque de Super Odd, Odd Boost, Odd Melhorada, Aposta Especial, ou prefixo TURBINACO (produto de Super Odds da Betnacional)
@@ -74,7 +76,10 @@ REGRAS DE EXTRAÇÃO:
 - turbo: 0 se não houver boost. "+25%" → 0.25, "+30%" → 0.30, "+50%" → 0.50
 - categoria: array com TODAS as categorias da aposta, usando APENAS valores da lista: ["Resultado","Finalizacoes","Escanteios","HT","FT","Gols","Chance Dupla","Chutes ao Gol","Ambas Marcam","Sofrer Falta","Cometer Falta","Cartoes","Defesas","Tiros livres","Tiros de Meta","Laterais","Desarmes","Impedimentos","Handicap","Outros"]. Ex: combinada "Ambas Marcam + Mais de 2 Gols" → ["Ambas Marcam","Gols"]. Se não corresponder a nenhum, retorne ["Outros"]. NUNCA retorne string, sempre array
 - Para campos não encontrados, use null
-- Responda APENAS com o JSON, sem markdown, sem explicações`;
+- Responda APENAS com o JSON, sem markdown, sem explicações${customInstructions?.trim() ? `
+
+INSTRUÇÕES PERSONALIZADAS DO USUÁRIO (seguir sempre, têm prioridade sobre o padrão acima quando conflitar):
+${customInstructions.trim()}` : ""}`;
 }
 
 const NVIDIA_MODELS = {
@@ -82,148 +87,124 @@ const NVIDIA_MODELS = {
   "11b": "meta/llama-3.2-11b-vision-instruct",
 } as const;
 
-async function callNvidia(
-  model: string,
-  systemPrompt: string,
-  imageBase64: string,
-  mimeType: string,
-  apiKey: string,
-) {
-  return fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
-    method: "POST",
-    headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model,
-      messages: [
-        { role: "system", content: systemPrompt },
-        {
-          role: "user",
-          content: [
-            { type: "image_url", image_url: { url: `data:${mimeType};base64,${imageBase64}` } },
-            { type: "text", text: "Extraia os dados desta aposta esportiva e retorne o JSON." },
-          ],
-        },
-      ],
-      max_tokens: 1024,
-      temperature: 0.1,
-    }),
-  });
-}
-
-async function callOpenAI(
-  systemPrompt: string,
-  imageBase64: string,
-  mimeType: string,
-  apiKey: string,
-) {
-  return fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: "gpt-4o-mini",
-      messages: [
-        { role: "system", content: systemPrompt },
-        {
-          role: "user",
-          content: [
-            { type: "image_url", image_url: { url: `data:${mimeType};base64,${imageBase64}`, detail: "high" } },
-            { type: "text", text: "Extraia os dados desta aposta esportiva e retorne o JSON." },
-          ],
-        },
-      ],
-      max_tokens: 1024,
-      temperature: 0.1,
-    }),
-  });
+function describeFailure(status: number, errorText: string): string {
+  if (status === 429) return "limite de requisições atingido (429)";
+  if (status === 402) return "sem créditos/cota esgotada (402)";
+  if (status === 401 || status === 403) return "chave inválida ou sem permissão";
+  if (errorText.toLowerCase().includes("insufficient_quota")) return "sem créditos/cota esgotada";
+  if (errorText.toLowerCase().includes("rate limit")) return "limite de requisições atingido";
+  return `erro ${status}: ${errorText.slice(0, 150)}`;
 }
 
 serve(async (req) => {
+  const cors = corsHeaders(req);
   if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+    return new Response("ok", { headers: cors });
   }
 
   try {
+    // Autenticação: exige token de sessão válido (protege o custo de IA de abuso anônimo).
+    const supabase = serviceClient();
+    const user_id = await getUserIdFromToken(req, supabase);
+    if (!user_id) {
+      return new Response(JSON.stringify({ error: "Não autenticado" }), {
+        status: 401,
+        headers: { ...cors, "Content-Type": "application/json" },
+      });
+    }
+
     const nvidiaApiKey = Deno.env.get("NVIDIA_API_KEY");
     const openaiApiKey = Deno.env.get("OPENAI_API_KEY");
+    const groqApiKey = Deno.env.get("GROQ_API_KEY");
 
-    const { imageBase64, mimeType = "image/jpeg", torneios = [], casas = [], currentDate, model } = await req.json();
+    const { imageBase64, mimeType = "image/jpeg", torneios = [], casas = [], currentDate, model, customInstructions } = await req.json();
     if (!imageBase64) throw new Error("imageBase64 é obrigatório");
+    if (typeof imageBase64 !== "string" || imageBase64.length > MAX_IMAGE_BASE64_LEN) {
+      return new Response(JSON.stringify({ error: "Imagem muito grande. Envie um print menor." }), {
+        status: 413,
+        headers: { ...cors, "Content-Type": "application/json" },
+      });
+    }
 
     const today = currentDate || new Date().toISOString().split("T")[0];
-    const systemPrompt = buildPrompt(torneios as string[], casas as string[], today);
+    const systemPrompt = buildPrompt(torneios as string[], casas as string[], today, customInstructions as string | undefined);
 
     type Job =
-      | { provider: "nvidia"; modelId: string }
-      | { provider: "openai" };
+      | { provider: "nvidia"; modelId: string; label: string }
+      | { provider: "openai"; label: string }
+      | { provider: "groq"; label: string };
 
     let jobs: Job[];
     if (model === "gpt4o") {
-      if (!openaiApiKey) throw new Error("OPENAI_API_KEY não configurada");
-      jobs = [{ provider: "openai" }];
+      jobs = [{ provider: "openai", label: "OpenAI (gpt-4o-mini)" }];
     } else if (model === "11b") {
-      if (!nvidiaApiKey) throw new Error("NVIDIA_API_KEY não configurada");
-      jobs = [{ provider: "nvidia", modelId: NVIDIA_MODELS["11b"] }];
+      jobs = [{ provider: "nvidia", modelId: NVIDIA_MODELS["11b"], label: "NVIDIA 11B" }];
     } else if (model === "90b") {
-      if (!nvidiaApiKey) throw new Error("NVIDIA_API_KEY não configurada");
-      jobs = [{ provider: "nvidia", modelId: NVIDIA_MODELS["90b"] }];
+      jobs = [{ provider: "nvidia", modelId: NVIDIA_MODELS["90b"], label: "NVIDIA 90B" }];
+    } else if (model === "groq") {
+      jobs = [{ provider: "groq", label: "Groq (Llama 4 Scout)" }];
     } else {
-      // auto: NVIDIA 90B → 11B → OpenAI
+      // auto: NVIDIA 90B → 11B → Groq → OpenAI
       jobs = [
-        ...(nvidiaApiKey ? [
-          { provider: "nvidia" as const, modelId: NVIDIA_MODELS["90b"] },
-          { provider: "nvidia" as const, modelId: NVIDIA_MODELS["11b"] },
-        ] : []),
-        ...(openaiApiKey ? [{ provider: "openai" as const }] : []),
+        { provider: "nvidia", modelId: NVIDIA_MODELS["90b"], label: "NVIDIA 90B" },
+        { provider: "nvidia", modelId: NVIDIA_MODELS["11b"], label: "NVIDIA 11B" },
+        { provider: "groq", label: "Groq (Llama 4 Scout)" },
+        { provider: "openai", label: "OpenAI (gpt-4o-mini)" },
       ];
-      if (jobs.length === 0) throw new Error("Nenhuma API key configurada (NVIDIA_API_KEY ou OPENAI_API_KEY)");
     }
 
-    let lastError = "";
+    const attempts: string[] = [];
     let usedModel = "";
 
     for (const job of jobs) {
-      let response: Response;
-      let label: string;
+      const apiKey = job.provider === "nvidia" ? nvidiaApiKey : job.provider === "groq" ? groqApiKey : openaiApiKey;
+      if (!apiKey) {
+        attempts.push(`${job.label}: chave não configurada`);
+        continue;
+      }
 
+      let response: Response;
       if (job.provider === "nvidia") {
-        if (!nvidiaApiKey) continue;
-        label = job.modelId;
-        response = await callNvidia(job.modelId, systemPrompt, imageBase64, mimeType, nvidiaApiKey);
+        response = await callNvidiaVision(job.modelId, systemPrompt, imageBase64, mimeType, apiKey);
+      } else if (job.provider === "groq") {
+        response = await callGroqVision(systemPrompt, imageBase64, mimeType, apiKey);
       } else {
-        if (!openaiApiKey) continue;
-        label = "gpt-4o-mini";
-        response = await callOpenAI(systemPrompt, imageBase64, mimeType, openaiApiKey);
+        response = await callOpenAIVision(systemPrompt, imageBase64, mimeType, apiKey);
       }
 
       if (!response.ok) {
         const errorText = await response.text();
-        lastError = `${label} → ${response.status}: ${errorText}`;
+        attempts.push(`${job.label}: ${describeFailure(response.status, errorText)}`);
         continue;
       }
 
       const data = await response.json();
       const rawContent = data.choices?.[0]?.message?.content ?? "";
 
-      const jsonMatch = rawContent.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) {
-        lastError = `${label} → JSON inválido: ${rawContent.slice(0, 200)}`;
+      const extracted = extractJson(rawContent);
+      if (!extracted) {
+        attempts.push(`${job.label}: resposta sem JSON válido`);
         continue;
       }
 
-      const extracted = JSON.parse(jsonMatch[0]);
-      usedModel = label;
+      usedModel = job.label;
 
       return new Response(JSON.stringify({ data: extracted, raw: rawContent, model: usedModel }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: { ...cors, "Content-Type": "application/json" },
         status: 200,
       });
     }
 
-    throw new Error(`Todos os modelos falharam. Último erro: ${lastError}`);
+    // Detalhe das tentativas fica só no log do servidor (não vaza texto de provider ao cliente).
+    console.error("extract-bet-image: todos os modelos falharam:", attempts.join(" | "));
+    return new Response(JSON.stringify({ error: "Não foi possível extrair a imagem. Tente outro print ou outro modelo." }), {
+      headers: { ...cors, "Content-Type": "application/json" },
+      status: 502,
+    });
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    return new Response(JSON.stringify({ error: message }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    console.error("extract-bet-image error:", error);
+    return new Response(JSON.stringify({ error: "Não foi possível extrair a imagem. Tente novamente." }), {
+      headers: { ...cors, "Content-Type": "application/json" },
       status: 500,
     });
   }

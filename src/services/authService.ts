@@ -3,7 +3,11 @@ import { supabase } from "@/integrations/supabase/client";
 export interface CustomUser {
   id: string;
   email: string;
+  /** JWT de sessão emitido por authenticate_custom_user/create_custom_user (RPC). */
+  session_token?: string;
 }
+
+const AUTH_KEY = "win_analytics_auth";
 
 export const authService = {
   async signIn(email: string, password: string): Promise<{ user?: CustomUser; error?: string }> {
@@ -34,14 +38,19 @@ export const authService = {
 
   persistSession(user: CustomUser | null) {
     if (user) {
-      localStorage.setItem('win_analytics_auth', JSON.stringify(user));
+      localStorage.setItem(AUTH_KEY, JSON.stringify(user));
     } else {
-      localStorage.removeItem('win_analytics_auth');
+      localStorage.removeItem(AUTH_KEY);
     }
   },
 
   getSession(): CustomUser | null {
-    const session = localStorage.getItem('win_analytics_auth');
+    const session = localStorage.getItem(AUTH_KEY);
     return session ? JSON.parse(session) : null;
+  },
+
+  /** Token de sessão para o header x-session-token (RLS + edge functions). */
+  getToken(): string | null {
+    return this.getSession()?.session_token ?? null;
   }
 };

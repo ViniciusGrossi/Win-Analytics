@@ -116,6 +116,7 @@ export default function Assistente() {
           message: userMessage.content,
           history,
           modelMode,
+          user_id: user.id,
         },
       });
 

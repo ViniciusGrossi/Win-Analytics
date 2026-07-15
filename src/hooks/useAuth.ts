@@ -6,9 +6,15 @@ export const useAuth = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check for existing session in local storage
+    // Sessão existente no localStorage. Sem session_token (login anterior à
+    // introdução do token), a RLS bloqueia toda leitura — força novo login.
     const sessionUser = authService.getSession();
-    setUser(sessionUser);
+    if (sessionUser && !sessionUser.session_token) {
+      authService.persistSession(null);
+      setUser(null);
+    } else {
+      setUser(sessionUser);
+    }
     setLoading(false);
   }, []);
 
