@@ -222,6 +222,30 @@ function computeAnalytics(bets: Bet[], bookies: { name: string; balance: number 
   };
 }
 
+// ── Provider calls (NVIDIA primary, Groq fallback) ──────────────────────────────
+
+type ChatMessage = { role: string; content: string };
+
+async function callNvidia(messages: ChatMessage[], modelConfig: Record<string, unknown>, apiKey: string) {
+  return fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ messages, ...modelConfig }),
+    signal: AbortSignal.timeout(30000),
+  });
+}
+
+const GROQ_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct";
+
+async function callGroq(messages: ChatMessage[], apiKey: string) {
+  return fetch("https://api.groq.com/openai/v1/chat/completions", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ model: GROQ_MODEL, messages, temperature: 0.3, max_tokens: 4096 }),
+    signal: AbortSignal.timeout(30000),
+  });
+}
+
 // ── Edge Function ─────────────────────────────────────────────────────────────
 
 serve(async (req) => {
@@ -250,7 +274,7 @@ serve(async (req) => {
     const analytics = computeAnalytics((allBets ?? []) as Bet[], bookies ?? []);
 
     const nvidiaApiKey = Deno.env.get("NVIDIA_API_KEY");
-    if (!nvidiaApiKey) throw new Error("NVIDIA_API_KEY não configurada");
+    const groqApiKey = Deno.env.get("GROQ_API_KEY");
 
     const systemPrompt = `Você é o **Win Analytics AI**, analista especializado em apostas esportivas. Tem acesso completo aos dados do usuário calculados em tempo real.
 
@@ -293,22 +317,32 @@ FORMATO OBRIGATÓRIO (JSON puro, sem markdown ao redor):
           top_p: 0.7,
         };
 
-    const response = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${nvidiaApiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ messages, ...modelConfig }),
-    });
+    const jobs: { call: () => Promise<Response>; label: string }[] = [];
+    if (nvidiaApiKey) jobs.push({ call: () => callNvidia(messages, modelConfig, nvidiaApiKey), label: `NVIDIA (${modelMode})` });
+    if (groqApiKey) jobs.push({ call: () => callGroq(messages, groqApiKey), label: "Groq" });
+    if (jobs.length === 0) throw new Error("Nenhuma chave de IA configurada (NVIDIA_API_KEY / GROQ_API_KEY)");
 
-    if (!response.ok) {
-      const err = await response.text();
-      throw new Error(`NVIDIA API ${response.status}: ${err}`);
+    const attempts: string[] = [];
+    let rawContent = "";
+    for (const job of jobs) {
+      try {
+        const response = await job.call();
+        if (!response.ok) {
+          const err = await response.text();
+          attempts.push(`${job.label}: erro ${response.status} — ${err.slice(0, 200)}`);
+          continue;
+        }
+        const data = await response.json();
+        rawContent = data.choices?.[0]?.message?.content ?? "";
+        if (rawContent) break;
+        attempts.push(`${job.label}: resposta vazia`);
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        attempts.push(`${job.label}: ${msg.includes("aborted") ? "timeout (30s)" : msg}`);
+      }
     }
 
-    const nvidiaData = await response.json();
-    const rawContent: string = nvidiaData.choices?.[0]?.message?.content ?? "";
+    if (!rawContent) throw new Error(`Falha ao gerar resposta:\n${attempts.join("\n")}`);
 
     const parsed = extractJson<{ reply: string; suggestedQuestions: string[] }>(rawContent)
       ?? { reply: rawContent, suggestedQuestions: [] };
