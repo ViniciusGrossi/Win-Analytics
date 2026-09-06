@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, RefreshCw, ScanLine } from "lucide-react";
+import { Plus, RefreshCw, ScanLine, Settings2, ChevronDown } from "lucide-react";
 import { ApostasTable } from "@/components/apostas/ApostasTable";
 import { CreateApostaDialog } from "@/components/apostas/CreateApostaDialog";
 import { ApostasFilters } from "@/components/apostas/ApostasFilters";
@@ -11,6 +11,10 @@ import { ImportarAposta } from "@/components/apostas/ImportarAposta";
 import type { ResultadoType } from "@/types/betting";
 import { startOfDay, endOfDay, subDays, isWithinInterval, parseISO } from "date-fns";
 import { useApostasList, useInvalidateApostas } from "@/hooks/useApostasQuery";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { ExtractionSettingsPanel } from "@/components/apostas/ExtractionSettingsPanel";
+import { useExtractionSettings } from "@/hooks/useExtractionSettings";
 
 export default function Apostas() {
   const { data: apostas = [], isLoading, isFetching, refetch } = useApostasList({});
@@ -18,6 +22,8 @@ export default function Apostas() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<"apostas" | "importar">("apostas");
   const [sharedImage, setSharedImage] = useState<File | null>(null);
+  const extraction = useExtractionSettings();
+  const [cfgOpen, setCfgOpen] = useState(false);
   const [selectedStatus, setSelectedStatus] = useState<ResultadoType | "Todos">("Todos");
   const [selectedCasa, setSelectedCasa] = useState<string>("Todas");
   const [selectedPeriod, setSelectedPeriod] = useState<string>("all");
@@ -194,17 +200,72 @@ export default function Apostas() {
         </TabsContent>
 
         <TabsContent value="importar">
-          <div className="max-w-lg mx-auto">
-            <div className="mb-4">
-              <h2 className="text-lg font-semibold">Importar Aposta via IA</h2>
-              <p className="text-sm text-muted-foreground">
-                Envie o print da aposta — o modelo extrai todos os dados automaticamente.
-              </p>
+          <div className="grid gap-6 lg:grid-cols-[340px_1fr]">
+            {/* desktop: coluna de config colapsável */}
+            <aside className="hidden lg:block">
+              <div className="sticky top-4">
+                <Collapsible defaultOpen className="rounded-xl border border-border bg-card p-4">
+                  <CollapsibleTrigger className="flex w-full items-center justify-between text-sm font-semibold">
+                    <span className="flex items-center gap-2">
+                      <Settings2 className="h-4 w-4" /> Configurar extração IA
+                    </span>
+                    <ChevronDown className="h-4 w-4" />
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="pt-4">
+                    <ExtractionSettingsPanel
+                      geral={extraction.geral}
+                      sections={extraction.sections}
+                      onGeralChange={extraction.setGeral}
+                      onSectionChange={extraction.setSection}
+                      onSave={extraction.save}
+                      saving={extraction.saving}
+                    />
+                  </CollapsibleContent>
+                </Collapsible>
+              </div>
+            </aside>
+
+            {/* fluxo de import */}
+            <div className="w-full max-w-lg">
+              <div className="mb-4 flex items-start justify-between gap-3">
+                <div>
+                  <h2 className="text-lg font-semibold">Importar Aposta via IA</h2>
+                  <p className="text-sm text-muted-foreground">
+                    Envie o print da aposta — o modelo extrai todos os dados automaticamente.
+                  </p>
+                </div>
+                <Sheet open={cfgOpen} onOpenChange={setCfgOpen}>
+                  <SheetTrigger asChild>
+                    <Button variant="outline" size="sm" className="lg:hidden shrink-0 gap-1.5">
+                      <Settings2 className="h-4 w-4" /> IA
+                    </Button>
+                  </SheetTrigger>
+                  <SheetContent side="left" className="w-[90vw] max-w-sm overflow-y-auto">
+                    <SheetHeader>
+                      <SheetTitle>Configurar extração IA</SheetTitle>
+                    </SheetHeader>
+                    <div className="mt-4">
+                      <ExtractionSettingsPanel
+                        geral={extraction.geral}
+                        sections={extraction.sections}
+                        onGeralChange={extraction.setGeral}
+                        onSectionChange={extraction.setSection}
+                        onSave={async () => { await extraction.save(); setCfgOpen(false); }}
+                        saving={extraction.saving}
+                      />
+                    </div>
+                  </SheetContent>
+                </Sheet>
+              </div>
+              <ImportarAposta
+                onSuccess={() => { invalidateApostas(); setActiveTab("apostas"); }}
+                sharedImage={sharedImage}
+                geral={extraction.geral}
+                sections={extraction.sections}
+                onLearnGeral={extraction.appendGeral}
+                onLearnSection={extraction.appendSection}
+              />
             </div>
-            <ImportarAposta
-              onSuccess={() => { invalidateApostas(); setActiveTab("apostas"); }}
-              sharedImage={sharedImage}
-            />
           </div>
         </TabsContent>
       </Tabs>

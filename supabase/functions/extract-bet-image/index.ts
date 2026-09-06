@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 import { serviceClient, getUserIdFromToken } from "../_shared/auth.ts";
 import { callNvidiaVision, callOpenAIVision, callGroqVision, extractJson } from "../_shared/ai-providers.ts";
+import { composeRules, SECTION_RULES } from "../_shared/extraction-rules.ts";
 
 // Limite do payload base64 da imagem (~8 MB de base64 ≈ ~6 MB de imagem).
 const MAX_IMAGE_BASE64_LEN = 8_000_000;
@@ -25,7 +26,13 @@ OUTRAS CASAS COMUNS (caso apareçam em prints):
 - Superbet: vermelho/bordô (#c0392b), logo "Superbet"
 - Pixbet: roxo/lilás, logo "pixbet"`;
 
-function buildPrompt(torneios: string[], casas: string[], currentDate: string, customInstructions?: string): string {
+export function buildPrompt(
+  torneios: string[],
+  casas: string[],
+  currentDate: string,
+  geralInstruction?: string,
+  sectionInstructions?: Record<string, string>,
+): string {
   const currentYear = currentDate.split("-")[0];
   const torneiosList = torneios.length > 0
     ? `TORNEIOS DISPONÍVEIS NO SISTEMA (use exatamente um destes valores ou null se não corresponder a nenhum):
@@ -37,7 +44,7 @@ ${torneios.map(t => `  - "${t}"`).join("\n")}`
 ${casas.map(c => `  - "${c}"`).join("\n")}`
     : "";
 
-  return `Você é um extrator especializado de dados de apostas esportivas brasileiras. Analise a imagem de um comprovante/ticket de aposta e extraia os dados em JSON.
+  return `${SECTION_RULES.geral.regra}
 
 Retorne APENAS um objeto JSON válido com esta estrutura exata:
 {
@@ -64,26 +71,13 @@ ${VISUAL_PATTERNS}
 DATA ATUAL DO SISTEMA: ${currentDate} (ano ${currentYear})
 
 REGRAS DE EXTRAÇÃO:
-- tipo_aposta: conte seleções/eventos. 1=Simples, 2=Dupla, 3=Tripla, 4+=Múltipla
-- torneio: OBRIGATÓRIO usar um dos valores da lista acima se a competição corresponder. Ex: "English Premier League"/"EPL"/"PL" → "Premier League". "UEFA Champions League" → "Champions League". TURBINACO não é torneio — é um produto da Betnacional; extraia a competição real ou retorne null. Se não corresponder a nenhum da lista, retorne null
-- casa_de_apostas: se a casa estiver na lista cadastrada, use o nome EXATO da lista. Se não estiver, use o nome que aparecer na imagem ou identifique pelos padrões visuais. TURBINACO e eventos com "(BN)" indicam Betnacional
-- data: extraia dia e mês da imagem. Para o ANO, use SEMPRE ${currentYear} exceto se um ano diferente estiver claramente impresso na imagem E fizer sentido (ex: aposta futura). Se só vir "HH:MM" ou "DD/MM" sem ano, use ${currentYear}
-- partida: SEMPRE use "x" minúsculo como separador entre os dois times/lados (ex: "Espanha x França", "Brasil x Argentina"). NUNCA use "vs", "vs.", "versus" ou "×" — normalize qualquer um desses para "x"
-- valor_apostado: valor em REAIS (R$) que o usuário pagou/apostou. Vem rotulado como "Valor", "Aposta", "Stake", "R$", "Valor da Aposta". É SEMPRE acompanhado de símbolo monetário (R$). NUNCA confunda com a odd (que é um número decimal sem R$). Exemplo: se a imagem mostra "R$ 20,00" ao lado de "Valor da Aposta" e "3.00" ao lado de "Odd", então valor_apostado=20, odd=3
-- odd: multiplicador decimal SEM símbolo monetário (ex: 1.50, 2.30, 3.00). Vem rotulado como "Odd", "Cota", "@ 3.00". Verificação cruzada: valor_apostado × odd ≈ "Potencial ganho" ou "Retorno". Se valor_apostado=20 e odd=3, potencial=60. Se não bater, revise os dois campos
-- is_super_odd: true se houver badge/destaque de Super Odd, Odd Boost, Odd Melhorada, Aposta Especial, ou prefixo TURBINACO (produto de Super Odds da Betnacional)
-- bonus: 0 para dinheiro real. Valor se indicar Freebet, Bônus, Saldo Bônus, Aposta Grátis
-- turbo: 0 se não houver boost. "+25%" → 0.25, "+30%" → 0.30, "+50%" → 0.50
-- categoria: array com TODAS as categorias da aposta, usando APENAS valores da lista: ["Resultado","Finalizacoes","Escanteios","HT","FT","Gols","Chance Dupla","Chutes ao Gol","Ambas Marcam","Sofrer Falta","Cometer Falta","Cartoes","Defesas","Tiros livres","Tiros de Meta","Laterais","Desarmes","Impedimentos","Handicap","Outros"]. Ex: combinada "Ambas Marcam + Mais de 2 Gols" → ["Ambas Marcam","Gols"]. Se não corresponder a nenhum, retorne ["Outros"]. NUNCA retorne string, sempre array
-- Para campos não encontrados, use null
-- Responda APENAS com o JSON, sem markdown, sem explicações${customInstructions?.trim() ? `
+${composeRules(sectionInstructions ?? {})}${geralInstruction?.trim() ? `
 
 INSTRUÇÕES PERSONALIZADAS DO USUÁRIO (seguir sempre, têm prioridade sobre o padrão acima quando conflitar):
-${customInstructions.trim()}` : ""}`;
+${geralInstruction.trim()}` : ""}`;
 }
 
 const NVIDIA_MODELS = {
-  "90b": "meta/llama-3.2-90b-vision-instruct",
   "11b": "meta/llama-3.2-11b-vision-instruct",
 } as const;
 
@@ -117,7 +111,7 @@ serve(async (req) => {
     const openaiApiKey = Deno.env.get("OPENAI_API_KEY");
     const groqApiKey = Deno.env.get("GROQ_API_KEY");
 
-    const { imageBase64, mimeType = "image/jpeg", torneios = [], casas = [], currentDate, model, customInstructions } = await req.json();
+    const { imageBase64, mimeType = "image/jpeg", torneios = [], casas = [], currentDate, model, customInstructions, sectionInstructions } = await req.json();
     if (!imageBase64) throw new Error("imageBase64 é obrigatório");
     if (typeof imageBase64 !== "string" || imageBase64.length > MAX_IMAGE_BASE64_LEN) {
       return new Response(JSON.stringify({ error: "Imagem muito grande. Envie um print menor." }), {
@@ -127,7 +121,13 @@ serve(async (req) => {
     }
 
     const today = currentDate || new Date().toISOString().split("T")[0];
-    const systemPrompt = buildPrompt(torneios as string[], casas as string[], today, customInstructions as string | undefined);
+    const systemPrompt = buildPrompt(
+      torneios as string[],
+      casas as string[],
+      today,
+      customInstructions as string | undefined,
+      sectionInstructions as Record<string, string> | undefined,
+    );
 
     type Job =
       | { provider: "nvidia"; modelId: string; label: string }
@@ -139,14 +139,11 @@ serve(async (req) => {
       jobs = [{ provider: "openai", label: "OpenAI (gpt-4o-mini)" }];
     } else if (model === "11b") {
       jobs = [{ provider: "nvidia", modelId: NVIDIA_MODELS["11b"], label: "NVIDIA 11B" }];
-    } else if (model === "90b") {
-      jobs = [{ provider: "nvidia", modelId: NVIDIA_MODELS["90b"], label: "NVIDIA 90B" }];
     } else if (model === "groq") {
       jobs = [{ provider: "groq", label: "Groq (Llama 4 Scout)" }];
     } else {
-      // auto: NVIDIA 90B → 11B → Groq → OpenAI
+      // auto: NVIDIA 11B → Groq → OpenAI
       jobs = [
-        { provider: "nvidia", modelId: NVIDIA_MODELS["90b"], label: "NVIDIA 90B" },
         { provider: "nvidia", modelId: NVIDIA_MODELS["11b"], label: "NVIDIA 11B" },
         { provider: "groq", label: "Groq (Llama 4 Scout)" },
         { provider: "openai", label: "OpenAI (gpt-4o-mini)" },
@@ -163,36 +160,41 @@ serve(async (req) => {
         continue;
       }
 
-      let response: Response;
-      if (job.provider === "nvidia") {
-        response = await callNvidiaVision(job.modelId, systemPrompt, imageBase64, mimeType, apiKey);
-      } else if (job.provider === "groq") {
-        response = await callGroqVision(systemPrompt, imageBase64, mimeType, apiKey);
-      } else {
-        response = await callOpenAIVision(systemPrompt, imageBase64, mimeType, apiKey);
-      }
+      try {
+        let response: Response;
+        if (job.provider === "nvidia") {
+          response = await callNvidiaVision(job.modelId, systemPrompt, imageBase64, mimeType, apiKey);
+        } else if (job.provider === "groq") {
+          response = await callGroqVision(systemPrompt, imageBase64, mimeType, apiKey);
+        } else {
+          response = await callOpenAIVision(systemPrompt, imageBase64, mimeType, apiKey);
+        }
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        attempts.push(`${job.label}: ${describeFailure(response.status, errorText)}`);
+        if (!response.ok) {
+          const errorText = await response.text();
+          attempts.push(`${job.label}: ${describeFailure(response.status, errorText)}`);
+          continue;
+        }
+
+        const data = await response.json();
+        const rawContent = data.choices?.[0]?.message?.content ?? "";
+
+        const extracted = extractJson(rawContent);
+        if (!extracted) {
+          attempts.push(`${job.label}: resposta sem JSON válido`);
+          continue;
+        }
+
+        usedModel = job.label;
+
+        return new Response(JSON.stringify({ data: extracted, raw: rawContent, model: usedModel }), {
+          headers: { ...cors, "Content-Type": "application/json" },
+          status: 200,
+        });
+      } catch (e) {
+        attempts.push(`${job.label}: ${e instanceof Error ? e.message : "erro inesperado"}`);
         continue;
       }
-
-      const data = await response.json();
-      const rawContent = data.choices?.[0]?.message?.content ?? "";
-
-      const extracted = extractJson(rawContent);
-      if (!extracted) {
-        attempts.push(`${job.label}: resposta sem JSON válido`);
-        continue;
-      }
-
-      usedModel = job.label;
-
-      return new Response(JSON.stringify({ data: extracted, raw: rawContent, model: usedModel }), {
-        headers: { ...cors, "Content-Type": "application/json" },
-        status: 200,
-      });
     }
 
     // Detalhe das tentativas fica só no log do servidor (não vaza texto de provider ao cliente).

@@ -1,24 +1,22 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/hooks/use-toast";
 import { ToastAction } from "@/components/ui/toast";
 import { apostasService } from "@/services/apostas";
 import { bookiesService } from "@/services/bookies";
-import { aiExtractionSettingsService } from "@/services/aiExtractionSettings";
 import type { Bookie } from "@/types/betting";
 import { supabase } from "@/integrations/supabase/client";
 import { ScanOverlay } from "./ScanOverlay";
 import { ApostaForm, type ApostaFormValues } from "./ApostaForm";
 import {
-  Upload, ImageIcon, Zap, X, CheckCircle2, AlertCircle, Loader2, Settings, ZoomIn
+  Upload, ImageIcon, Zap, X, CheckCircle2, AlertCircle, Loader2, ZoomIn
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { TORNEIOS } from "@/lib/apostas-constants";
 import {
-  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
+  Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
@@ -42,6 +40,10 @@ interface ExtractedData {
 interface ImportarApostaProps {
   onSuccess: () => void;
   sharedImage?: File | null;
+  geral: string;
+  sections: Record<string, string>;
+  onLearnGeral: (rule: string) => void | Promise<void>;
+  onLearnSection: (key: "casa_de_apostas" | "torneio", rule: string) => void | Promise<void>;
 }
 
 type Step = "upload" | "scanning" | "review" | "done";
@@ -51,7 +53,7 @@ interface QueueItem {
   preview: string;
 }
 
-export function ImportarAposta({ onSuccess, sharedImage }: ImportarApostaProps) {
+export function ImportarAposta({ onSuccess, sharedImage, geral, sections, onLearnGeral, onLearnSection }: ImportarApostaProps) {
   const [step, setStep] = useState<Step>("upload");
   const [queue, setQueue] = useState<QueueItem[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -60,12 +62,9 @@ export function ImportarAposta({ onSuccess, sharedImage }: ImportarApostaProps) 
   const [bookies, setBookies] = useState<Bookie[]>([]);
   const [extractedDefaults, setExtractedDefaults] = useState<Partial<ApostaFormValues> | undefined>(undefined);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [selectedModel, setSelectedModel] = useState<"auto" | "90b" | "11b" | "gpt4o" | "groq">("auto");
+  const [selectedModel, setSelectedModel] = useState<"auto" | "11b" | "gpt4o" | "groq">("auto");
   const [extractError, setExtractError] = useState<string | null>(null);
   const [imageModalOpen, setImageModalOpen] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(false);
-  const [customInstructions, setCustomInstructions] = useState("");
-  const [savingInstructions, setSavingInstructions] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   // Guarda o que a IA extraiu (pós-normalização) para detectar correções do usuário no review.
   const lastExtractedRef = useRef<{ casa_de_apostas: string; torneio: string } | null>(null);
@@ -74,7 +73,6 @@ export function ImportarAposta({ onSuccess, sharedImage }: ImportarApostaProps) 
 
   useEffect(() => {
     bookiesService.list().then(setBookies).catch(console.error);
-    aiExtractionSettingsService.get().then(setCustomInstructions).catch(console.error);
   }, []);
 
   useEffect(() => {
@@ -107,19 +105,6 @@ export function ImportarAposta({ onSuccess, sharedImage }: ImportarApostaProps) 
     handleFiles(Array.from(e.dataTransfer.files));
   }, [handleFiles]);
 
-  const saveInstructions = async () => {
-    setSavingInstructions(true);
-    try {
-      await aiExtractionSettingsService.save(customInstructions);
-      toast({ title: "Instruções salvas" });
-      setSettingsOpen(false);
-    } catch (error) {
-      toast({ title: "Erro ao salvar", description: error instanceof Error ? error.message : "Erro", variant: "destructive" });
-    } finally {
-      setSavingInstructions(false);
-    }
-  };
-
   const handleExtract = async (indexOverride?: number) => {
     const idx = indexOverride ?? currentIndex;
     const item = queue[idx];
@@ -138,7 +123,8 @@ export function ImportarAposta({ onSuccess, sharedImage }: ImportarApostaProps) 
           casas: bookies.map(b => b.name),
           currentDate: format(new Date(), "yyyy-MM-dd"),
           ...(selectedModel !== "auto" ? { model: selectedModel } : {}),
-          ...(customInstructions.trim() ? { customInstructions: customInstructions.trim() } : {}),
+          ...(geral.trim() ? { customInstructions: geral.trim() } : {}),
+          ...(Object.keys(sections).length ? { sectionInstructions: sections } : {}),
         },
       });
 
@@ -214,17 +200,6 @@ export function ImportarAposta({ onSuccess, sharedImage }: ImportarApostaProps) 
     }
   };
 
-  const saveLearnedRule = async (rule: string) => {
-    try {
-      const updated = customInstructions.trim() ? `${customInstructions.trim()}\n${rule}` : rule;
-      await aiExtractionSettingsService.save(updated);
-      setCustomInstructions(updated);
-      toast({ title: "Regra salva", description: "A IA vai considerar isso nas próximas extrações" });
-    } catch (error) {
-      toast({ title: "Erro ao salvar regra", description: error instanceof Error ? error.message : "Erro", variant: "destructive" });
-    }
-  };
-
   const onSubmit = async (data: ApostaFormValues, selectedBookie: Bookie | null) => {
     if (!selectedBookie) return;
     setIsSubmitting(true);
@@ -253,20 +228,30 @@ export function ImportarAposta({ onSuccess, sharedImage }: ImportarApostaProps) 
       // Detecta correção do usuário sobre o que a IA extraiu e oferece virar regra permanente.
       const extracted = lastExtractedRef.current;
       if (extracted) {
-        const corrections: string[] = [];
-        if (extracted.casa_de_apostas && data.casa_de_apostas && extracted.casa_de_apostas !== data.casa_de_apostas) {
-          corrections.push(`Quando a IA identificar a casa "${extracted.casa_de_apostas}", deve considerar "${data.casa_de_apostas}"`);
-        }
-        if (extracted.torneio && data.torneio && extracted.torneio !== data.torneio) {
-          corrections.push(`Quando a IA identificar o torneio "${extracted.torneio}", deve considerar "${data.torneio}"`);
-        }
-        if (corrections.length > 0) {
-          const rule = corrections.join(". ");
+        const casaChanged =
+          extracted.casa_de_apostas && data.casa_de_apostas && extracted.casa_de_apostas !== data.casa_de_apostas;
+        const torneioChanged = extracted.torneio && data.torneio && extracted.torneio !== data.torneio;
+
+        if (casaChanged || torneioChanged) {
+          const apply = async () => {
+            if (casaChanged) {
+              await onLearnSection(
+                "casa_de_apostas",
+                `Quando identificar a casa "${extracted.casa_de_apostas}", considere "${data.casa_de_apostas}"`,
+              );
+            }
+            if (torneioChanged) {
+              await onLearnSection(
+                "torneio",
+                `Quando identificar o torneio "${extracted.torneio}", considere "${data.torneio}"`,
+              );
+            }
+          };
           toast({
             title: "Notei uma correção",
             description: "Quer ensinar essa regra pra IA não errar de novo?",
             action: (
-              <ToastAction altText="Salvar regra" onClick={() => saveLearnedRule(rule)}>
+              <ToastAction altText="Salvar regra" onClick={apply}>
                 Salvar regra
               </ToastAction>
             ),
@@ -356,7 +341,7 @@ export function ImportarAposta({ onSuccess, sharedImage }: ImportarApostaProps) 
             {queue.length > 0 && (
               <div className="space-y-2">
                 <div className="flex gap-1.5 justify-center items-center flex-wrap">
-                  {(["auto", "90b", "11b", "gpt4o", "groq"] as const).map((m) => (
+                  {(["auto", "11b", "gpt4o", "groq"] as const).map((m) => (
                     <button
                       key={m}
                       type="button"
@@ -368,15 +353,9 @@ export function ImportarAposta({ onSuccess, sharedImage }: ImportarApostaProps) 
                           : "bg-background text-muted-foreground border-border hover:border-primary/50"
                       )}
                     >
-                      {m === "auto" ? "⚡ Auto" : m === "90b" ? "🎯 90B" : m === "11b" ? "🚀 11B" : m === "gpt4o" ? "🤖 GPT-4o" : "🐐 Groq"}
+                      {m === "auto" ? "⚡ Auto" : m === "11b" ? "🚀 11B" : m === "gpt4o" ? "🤖 GPT-4o" : "🐐 Groq"}
                     </button>
                   ))}
-                  <button type="button" onClick={() => setSettingsOpen(true)}
-                    className="flex items-center gap-1 px-2.5 py-1 rounded-full border border-border text-muted-foreground hover:border-primary/50 hover:text-primary transition-all text-xs font-medium"
-                    title="Ensinar regras de extração para a IA">
-                    <Settings className="h-3.5 w-3.5" />
-                    Ensinar a IA
-                  </button>
                 </div>
                 <Button onClick={() => { setCurrentIndex(0); handleExtract(0); }} className="w-full" size="lg">
                   <Zap className="h-4 w-4 mr-2" /> Extrair Dados ({queue.length} {queue.length > 1 ? "imagens" : "imagem"})
@@ -487,32 +466,6 @@ export function ImportarAposta({ onSuccess, sharedImage }: ImportarApostaProps) 
           </motion.div>
         )}
       </AnimatePresence>
-
-      <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Ensinar a IA</DialogTitle>
-            <DialogDescription>
-              Regras que a IA deve sempre seguir ao ler o print de uma aposta — corrigem comportamentos fora do padrão. Aplicadas em toda extração, com prioridade sobre o padrão do sistema.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="rounded-lg border border-border bg-muted/30 p-3 text-xs text-muted-foreground space-y-1">
-            <p className="font-medium text-foreground">Exemplos:</p>
-            <p>"A casa 'Estrela Bet' deve ser registrada como 'EstrelaBet'"</p>
-            <p>"Nunca marque categoria 'Outros' se a partida tiver escanteios"</p>
-            <p>"Aposta em criptomoeda: tratar valor em USD como se fosse R$"</p>
-          </div>
-          <Textarea
-            value={customInstructions}
-            onChange={(e) => setCustomInstructions(e.target.value)}
-            placeholder="Ex: sempre usar o nome completo do torneio, nunca abreviar nomes de times..."
-            rows={6}
-          />
-          <Button onClick={saveInstructions} disabled={savingInstructions} className="w-full">
-            {savingInstructions ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Salvando...</> : "Salvar Instruções"}
-          </Button>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

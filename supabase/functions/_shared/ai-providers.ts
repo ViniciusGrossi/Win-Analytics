@@ -6,6 +6,17 @@
 
 export const GROQ_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct";
 
+/** fetch com AbortController — um provider pendurado não pode consumir o wall-clock da edge function. */
+export async function fetchWithTimeout(url: string, init: RequestInit, ms = 25_000): Promise<Response> {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), ms);
+  try {
+    return await fetch(url, { ...init, signal: ctrl.signal });
+  } finally {
+    clearTimeout(t);
+  }
+}
+
 // ── Texto (usado por ai-insights) ──────────────────────────────────────────
 
 export async function callOpenAIText(systemPrompt: string, apiKey: string) {
@@ -54,7 +65,7 @@ function visionMessages(systemPrompt: string, imageBase64: string, mimeType: str
 }
 
 export async function callNvidiaVision(model: string, systemPrompt: string, imageBase64: string, mimeType: string, apiKey: string) {
-  return fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
+  return fetchWithTimeout("https://integrate.api.nvidia.com/v1/chat/completions", {
     method: "POST",
     headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -67,7 +78,7 @@ export async function callNvidiaVision(model: string, systemPrompt: string, imag
 }
 
 export async function callOpenAIVision(systemPrompt: string, imageBase64: string, mimeType: string, apiKey: string) {
-  return fetch("https://api.openai.com/v1/chat/completions", {
+  return fetchWithTimeout("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -80,7 +91,7 @@ export async function callOpenAIVision(systemPrompt: string, imageBase64: string
 }
 
 export async function callGroqVision(systemPrompt: string, imageBase64: string, mimeType: string, apiKey: string) {
-  return fetch("https://api.groq.com/openai/v1/chat/completions", {
+  return fetchWithTimeout("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
     headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
     body: JSON.stringify({
